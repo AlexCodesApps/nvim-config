@@ -1,0 +1,7 @@
+rg
+clangd
+lua-language-server
+typescript-language-server
+vscode-css-language-server
+vscode-html-language-server
+emmet-language-server
