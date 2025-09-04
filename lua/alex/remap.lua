@@ -17,3 +17,27 @@ vim.keymap.set({'n', 'x'}, '<leader>p', '"+p')
 vim.keymap.set({'n', 'x'}, '<leader>P', '"+P')
 vim.keymap.set({'n', 't'}, '<C-x>z', require('alex.floaterm').toggle)
 vim.keymap.set({'n', 't'}, '<C-x><C-z>', require('alex.floaterm').toggle)
+vim.keymap.set({'n', 'x'}, '<S-Tab>', function()
+	if vim.w.alex_focus then
+		local state = vim.w.alex_focus
+		local pos = vim.api.nvim_win_get_cursor(0)
+		local bufid = vim.api.nvim_get_current_buf()
+		vim.cmd.tabclose()
+		vim.api.nvim_set_current_tabpage(state.tabid)
+		vim.api.nvim_set_current_win(state.winid)
+		vim.api.nvim_set_current_buf(bufid)
+		vim.api.nvim_win_set_cursor(0, pos)
+		return
+	end
+	local bufid = vim.api.nvim_get_current_buf()
+	local winid = vim.api.nvim_get_current_win()
+	local tabid = vim.api.nvim_get_current_tabpage()
+	local pos = vim.api.nvim_win_get_cursor(0)
+	vim.cmd.tabnew()
+	vim.api.nvim_set_current_buf(bufid)
+	vim.api.nvim_win_set_cursor(0, pos)
+	vim.w.alex_focus = {
+		winid = winid,
+		tabid = tabid,
+	}
+end)

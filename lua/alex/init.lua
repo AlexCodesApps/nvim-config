@@ -5,6 +5,7 @@ vim.cmd.colorscheme('github_dark_default')
 vim.cmd.set('splitright')
 vim.o.completeopt = "menuone,noinsert"
 vim.o.indentexpr = "nvim_treesitter#indent()"
+vim.o.showtabline = 0
 
 -- local blink = require('blink.cmp')
 -- local function split_signature()
