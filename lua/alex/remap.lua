@@ -8,10 +8,6 @@ vim.keymap.set('n', '<C-h>', '<C-w><C-h>')
 vim.keymap.set('n', '<C-j>', '<C-w><C-j>')
 vim.keymap.set('n', '<C-k>', '<C-w><C-k>')
 vim.keymap.set('n', '<C-l>', '<C-w><C-l>')
-vim.keymap.set('n', '<leader>bn', ':bnext<CR>')
-vim.keymap.set('n', '<leader>bp', ':bprev<CR>')
-vim.keymap.set('n', '<leader>n', 'o<Esc>k')
-vim.keymap.set('n', '<leader>N', 'O<Esc>j')
 vim.keymap.set({'n', 'x'}, '<leader>y', '"+y')
 vim.keymap.set({'n', 'x'}, '<leader>p', '"+p')
 vim.keymap.set({'n', 'x'}, '<leader>P', '"+P')
@@ -41,3 +37,29 @@ vim.keymap.set({'n', 'x'}, '<S-Tab>', function()
 		tabid = tabid,
 	}
 end)
+
+vim.keymap.set('n', '<leader>ff', require('alex.ffind').find_file)
+vim.keymap.set('n', '<leader>fc', function()
+	require('alex.ffind').find_file({
+		cwd = vim.fn.stdpath('config'),
+		exclude_pattern = '^\\.',
+	})
+end)
+vim.keymap.set('n', '<leader>fr', function()
+	require('alex.ffind').find_file({
+		cwd = os.getenv('HOME'),
+	})
+end)
+
+vim.keymap.set('n', '<leader>de', function()
+	vim.diagnostic.setqflist {
+		severity = "ERROR",
+
+	}
+end)
+vim.keymap.set('n', '<leader>dw', function()
+	vim.diagnostic.setqflist {
+		severity = "WARN",
+	}
+end)
+vim.keymap.set('n', '<leader>da', vim.diagnostic.setqflist)

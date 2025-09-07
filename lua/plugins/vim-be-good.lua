@@ -1,1 +1,3 @@
-return { 'https://github.com/ThePrimeagen/vim-be-good' }
+return {
+	-- 'https://github.com/ThePrimeagen/vim-be-good'
+}
