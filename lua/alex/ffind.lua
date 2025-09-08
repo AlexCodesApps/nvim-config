@@ -38,7 +38,6 @@ end
 ---@field screen_lines string[]
 ---@field screen_offset integer
 ---@field screen_cursor_offset integer
----@field cursor_offset integer
 ---@field sorter fun(lines: alex.ffind.PickerEntry[], input: string): alex.ffind.PickerEntry[]
 ---@field schedule_id integer
 
@@ -51,6 +50,11 @@ local function terminate_winstate()
 	vim.api.nvim_win_close(winstate.outer_window, true)
 	vim.cmd.stopinsert()
 	winstate = nil
+end
+
+local function get_cursor_offset()
+	assert(winstate)
+	return winstate.screen_offset + winstate.screen_cursor_offset
 end
 
 ---@return integer
@@ -92,7 +96,6 @@ end
 local function reset_winstate_lines()
 	assert(winstate)
 	winstate.screen_offset = 0
-	winstate.cursor_offset = 0
 	winstate.screen_cursor_offset = 0
 	winstate.screen_lines = get_winstate_lines()
 	print_winstate_lines()
@@ -179,9 +182,8 @@ end
 
 local function move_cursor_up()
 	assert(winstate)
-	if winstate.cursor_offset + 1 == #winstate.fzlines then return end
+	if get_cursor_offset() + 1 == #winstate.fzlines then return end
 	if screen_cursor_offset_check(winstate.screen_cursor_offset + 1) then
-		winstate.cursor_offset = winstate.cursor_offset + 1
 		winstate.screen_cursor_offset = winstate.screen_cursor_offset + 1
 	else
 		scroll_screen_up(true)
@@ -191,9 +193,8 @@ end
 
 local function move_cursor_down()
 	assert(winstate)
-	if winstate.cursor_offset == 0 then return end
+	if get_cursor_offset() == 0 then return end
 	if screen_cursor_offset_check(winstate.screen_cursor_offset - 1) then
-		winstate.cursor_offset = winstate.cursor_offset + 1
 		winstate.screen_cursor_offset = winstate.screen_cursor_offset - 1
 	else
 		scroll_screen_down(true)
@@ -215,12 +216,8 @@ scroll_screen_up = function(move_cursor)
 	if not move_cursor then
 		if screen_cursor_offset_check(winstate.screen_cursor_offset - 1) then
 			winstate.screen_cursor_offset = winstate.screen_cursor_offset - 1
-		else
-			winstate.cursor_offset = winstate.cursor_offset + 1
 		end
 		print_screen_cursor()
-	else
-		winstate.cursor_offset = winstate.cursor_offset + 1
 	end
 end
 
@@ -238,12 +235,8 @@ scroll_screen_down = function(move_cursor)
 	if not move_cursor then
 		if screen_cursor_offset_check(winstate.screen_cursor_offset + 1) then
 			winstate.screen_cursor_offset = winstate.screen_cursor_offset + 1
-		else
-			winstate.cursor_offset = winstate.cursor_offset - 1
 		end
 		print_screen_cursor()
-	else
-		winstate.cursor_offset = winstate.cursor_offset - 1
 	end
 end
 
@@ -253,7 +246,7 @@ local function get_selected_field()
 	if #winstate.fzlines == 0 then
 		return nil
 	end
-	return winstate.fzlines[1 + winstate.cursor_offset]
+	return winstate.fzlines[1 + get_cursor_offset()]
 end
 
 ---@param lines alex.ffind.PickerEntry[]
@@ -308,7 +301,6 @@ local function open_picker(lines, on_select, sorter)
 		screen_lines = {},
 		screen_offset = 0,
 		sorter = sorter,
-		cursor_offset = 0,
 		screen_cursor_offset = 0,
 		schedule_id = 0,
 }
