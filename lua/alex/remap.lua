@@ -38,23 +38,36 @@ vim.keymap.set({'n', 'x'}, '<S-Tab>', function()
 	}
 end)
 
-vim.keymap.set('n', '<leader>ff', require('alex.ffind').find_file)
+vim.keymap.set('n', '<leader>ff', function()
+	require('alex.ffind').find_file {
+		exclude_pattern = vim.g.ffind_exclude_pattern,
+		gitignore = vim.g.ffind_gitignore == 1,
+	}
+end)
 vim.keymap.set('n', '<leader>fc', function()
-	require('alex.ffind').find_file({
+	require('alex.ffind').find_file {
 		cwd = vim.fn.stdpath('config'),
-		exclude_pattern = '^\\.',
-	})
+		gitignore = true,
+	}
 end)
 vim.keymap.set('n', '<leader>fr', function()
-	require('alex.ffind').find_file({
+	require('alex.ffind').find_file {
 		cwd = os.getenv('HOME'),
-	})
+	}
+end)
+vim.keymap.set('n', '<leader>fg', function()
+	require('alex.ffind').grep_files {
+		exclude_pattern = vim.g.ffind_exclude_pattern,
+		gitignore = vim.g.ffind_gitignore == 1
+	}
+end)
+vim.keymap.set('n', '<leader>fh', function()
+	require('alex.ffind').find_help()
 end)
 
 vim.keymap.set('n', '<leader>de', function()
 	vim.diagnostic.setqflist {
 		severity = "ERROR",
-
 	}
 end)
 vim.keymap.set('n', '<leader>dw', function()

@@ -16,6 +16,7 @@ vim.o.hls = false
 vim.g.c_no_curly_error = 1
 vim.g.signcolumn = "yes:1"
 vim.g.netrw_banner = 0
+vim.g.ffind_gitignore = 1
 vim.o.completeopt = "menuone,noinsert,fuzzy"
 vim.o.indentexpr = "nvim_treesitter#indent()"
 vim.o.showtabline = 0
