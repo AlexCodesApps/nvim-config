@@ -551,43 +551,22 @@ function M.workspace_symbols()
 	})
 end
 
-local find_manpage_state = nil
-
+local cached_manpages_entries = nil
 function M.find_manpage()
-	local function fetch_manpages(callback)
-		if not find_manpage_state then
-			find_manpage_state = {
-				ready = false,
-				callback = callback
-			}
-		elseif find_manpage_state.ready == true then
-			callback(find_manpage_state.entries)
-			return
-		else
-			-- clear previous callback because there can only be one
-			-- picker at a time
-			find_manpage_state.callback = callback
-			return
-		end
+	if not cached_manpages_entries then
 		local cmd = { "apropos", ".*" }
-		vim.system(cmd, { text = true }, function(result)
-			local output = result.stdout
-			if output == nil then
-				error("couldn't grab manpages")
+		local output = vim.system(cmd, { text = true }):wait().stdout
+		if output == nil then
+			error("couldn't grab manpages")
+		end
+		local entries = {}
+		for line in vim.gsplit(output, "\n") do
+			local entry, part = string.match(line, "^([^%s]+)%s([^%s]+)")
+			if entry then
+				table.insert(entries, M.picker_entry.new(entry .. part, nil))
 			end
-			local entries = {}
-			for line in vim.gsplit(output, "\n") do
-				local entry, part = string.match(line, "^([^%s]+)%s([^%s]+)")
-				if entry then
-					table.insert(entries, M.picker_entry.new(entry .. part, nil))
-				end
-			end
-			vim.schedule(function()
-				find_manpage_state.callback(entries)
-				find_manpage_state.ready = true
-				find_manpage_state.entries = entries
-			end)
-		end)
+		end
+		cached_manpages_entries = entries
 	end
 	local function on_select(selected, winmode)
 		if not selected then return end
@@ -600,11 +579,9 @@ function M.find_manpage()
 		end
 		vim.cmd("hide Man " .. selected.text)
 	end
-	fetch_manpages(function(entries)
-		M.open_picker(entries, {
-			on_select = on_select
-		})
-	end)
+	M.open_picker(cached_manpages_entries, {
+		on_select = on_select
+	})
 end
 
 return M
