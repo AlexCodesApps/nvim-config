@@ -115,31 +115,28 @@ end
 ---@param prefix? string
 ---@param exclude_pattern? string
 ---@param gitignore boolean
----@return string[]
-local function get_recursive_files(cwd, prefix, exclude_pattern, gitignore)
-	local re = exclude_pattern and vim.regex(exclude_pattern)
-	local gi = gitignore and M.gitignore.from_cwd(cwd)
-	prefix = prefix or cwd
-	local function iter(files, path, upath, fst)
-		for _, filename in ipairs(vim.fn.readdir(path)) do
-			local n_upath
-			if fst then
-				n_upath = upath .. filename
-			else
-				n_upath = upath .. "/" .. filename
-			end
-			if gi and not gi:allow(n_upath) then goto next end
-			local n_path = cwd .. "/" .. n_upath
-			if vim.fn.isdirectory(n_path) == 1 then
-				iter(files, n_path, n_upath, false)
-				goto next
-			end
-			table.insert(files, prefix .. n_upath)
-			::next::
-		end
-		return files
+---@param callback fun(files: string[])
+local function find_recursive_files(cwd, prefix, exclude_pattern, gitignore, callback)
+	prefix = prefix or ""
+	local cmd
+	if gitignore then
+		cmd = { "rg", "--files" }
+	else
+		cmd = { "rg", "--no-ignore", "--files" }
 	end
-	return iter({}, cwd, "", true)
+	vim.system(cmd, {
+		cwd = cwd,
+	}, function(result)
+		local output = result.stdout
+		assert(output)
+		local files = {}
+		for line in vim.gsplit(output, "\n") do
+			if line ~= "" and (not exclude_pattern or line:match(exclude_pattern)) then
+				table.insert(files, prefix .. line)
+			end
+		end
+		vim.schedule(function() callback(files) end)
+	end)
 end
 
 local function screen_cursor_offset_check(offset)
@@ -355,76 +352,6 @@ function M.default_sorter(entries, input, callback)
 	}))
 end
 
----@class alex.ffind.GitIgnoreRule
----@field allow boolean
----@field match_root boolean
----@field pattern vim.lpeg.Pattern
-
----@class alex.ffind.GitIgnore
----@field rules alex.ffind.GitIgnoreRule[]
-M.gitignore = {}
-
----@param src string[]
----@return alex.ffind.GitIgnore
-function M.gitignore.parse(src)
-	local rules = {}
-	local function convert(allow, str)
-		local match_root = #str > 1 and str[1] == "/"
-		return { allow = allow, match_root = match_root, pattern = vim.glob.to_lpeg(str) } ---@type alex.ffind.GitIgnoreRule
-	end
-	for _, line in ipairs(src) do
-		if line == "" then goto continue end
-		local c1 = line:sub(1, 1)
-		if c1 == "#" then
-			goto continue
-		elseif c1 == "!" then
-			table.insert(rules, convert(true, string.sub(line, 2)))
-		elseif c1 == "\\" then
-			 table.insert(rules, convert(false, string.sub(line, 2)))
-		else
-			table.insert(rules, convert(false, line))
-		end
-		::continue::
-	end
-	local obj = {
-		rules = rules
-	}
-	setmetatable(obj, M.gitignore)
-	return obj
-end
-
----@param cwd? string
----@return alex.ffind.GitIgnore?
-function M.gitignore.from_cwd(cwd)
-	cwd = cwd or vim.fn.getcwd()
-	local ok, lines = pcall(vim.fn.readfile, cwd .. "/.gitignore")
-	if not ok then
-		return nil
-	end
-	return M.gitignore.parse(lines)
-end
-
----@param path string
----@return boolean
-function M.gitignore:allow(path)
-	local allow = true
-	if path == ".git" or string.match(path, "^%.git/") then
-		return false
-	end
-	for _, rule in ipairs(self.rules) do
-		local to_match = path
-		if rule.match_root then
-			to_match = "/" .. path
-		end
-		if rule.pattern:match(to_match) then
-			allow = rule.allow
-		end
-	end
-	return allow
-end
-
-M.gitignore.__index = M.gitignore
-
 ---@class alex.ffind.FindFileConfig
 ---@field cwd? string
 ---@field exclude_pattern? string
@@ -448,11 +375,12 @@ function M.find_file(config)
 		}
 		vim.cmd(table[winmode] .. path .. "/" .. line)
 	end
-	local files = get_recursive_files(path, "", exclude_pattern, gitignore)
-	local entries = M.picker_entry.from_list(files)
-	M.open_picker(entries, {
-		on_select = on_select
-	})
+	find_recursive_files(path, "", exclude_pattern, gitignore, function(files)
+		local entries = M.picker_entry.from_list(files)
+		M.open_picker(entries, {
+			on_select = on_select
+		})
+	end)
 end
 
 ---@class alex.ffind.GrepFilesConfig
@@ -477,11 +405,11 @@ function M.grep_files(config)
 		end
 		local cmd
 		if gitignore then
-			cmd = { "rg", "-n", "--no-heading", "--no-ignore", input }
-		else
 			cmd = { "rg", "-n", "--no-heading", input };
+		else
+			cmd = { "rg", "-n", "--no-heading", "--no-ignore", input }
 		end
-		running_future = vim.system(cmd, { cwd = cwd, text = true, }, function(result)
+		running_future = vim.system(cmd, { cwd = cwd, text = true }, function(result)
 			if result.code ~= 0 then return end
 			local lines_iter = vim.gsplit(result.stdout, "\n")
 			local entries = {}
@@ -621,6 +549,62 @@ function M.workspace_symbols()
 	vim.lsp.buf.workspace_symbol("", {
 		on_list = open_picker_qf_symbol_list
 	})
+end
+
+local find_manpage_state = nil
+
+function M.find_manpage()
+	local function fetch_manpages(callback)
+		if not find_manpage_state then
+			find_manpage_state = {
+				ready = false,
+				callback = callback
+			}
+		elseif find_manpage_state.ready == true then
+			callback(find_manpage_state.entries)
+			return
+		else
+			-- clear previous callback because there can only be one
+			-- picker at a time
+			find_manpage_state.callback = callback
+			return
+		end
+		local cmd = { "apropos", ".*" }
+		vim.system(cmd, { text = true }, function(result)
+			local output = result.stdout
+			if output == nil then
+				error("couldn't grab manpages")
+			end
+			local entries = {}
+			for line in vim.gsplit(output, "\n") do
+				local entry, part = string.match(line, "^([^%s]+)%s([^%s]+)")
+				if entry then
+					table.insert(entries, M.picker_entry.new(entry .. part, nil))
+				end
+			end
+			vim.schedule(function()
+				find_manpage_state.callback(entries)
+				find_manpage_state.ready = true
+				find_manpage_state.entries = entries
+			end)
+		end)
+	end
+	local function on_select(selected, winmode)
+		if not selected then return end
+		if winmode ~= "none" then
+			local table = {
+				norm = "new",
+				vert = "vnew",
+			}
+			vim.cmd(table[winmode])
+		end
+		vim.cmd("hide Man " .. selected.text)
+	end
+	fetch_manpages(function(entries)
+		M.open_picker(entries, {
+			on_select = on_select
+		})
+	end)
 end
 
 return M

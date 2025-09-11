@@ -65,34 +65,7 @@ end)
 vim.keymap.set('n', '<leader>fh', ffind.find_help)
 vim.keymap.set('n', '<leader>fo', ffind.document_symbols)
 vim.keymap.set('n', '<leader>fw', ffind.workspace_symbols)
-vim.keymap.set('n', '<leader>fm', function()
-	local cmd = { "apropos", ".*" }
-	local output = vim.system(cmd, { text = true }):wait().stdout
-	if output == nil then
-		error("couldn't grab manpages")
-	end
-	local entries = {}
-	for line in vim.gsplit(output, "\n") do
-		local entry, part = string.match(line, "^([^%s]+)%s([^%s]+)")
-		if entry then
-			table.insert(entries, ffind.picker_entry.new(entry .. part, nil))
-		end
-	end
-	local function on_select(selected, winmode)
-		if not selected then return end
-		if winmode ~= "none" then
-			local table = {
-				norm = "new",
-				vert = "vnew",
-			}
-			vim.cmd(table[winmode])
-		end
-		vim.cmd("hide Man " .. selected.text)
-	end
-	ffind.open_picker(entries, {
-		on_select = on_select
-	})
-end)
+vim.keymap.set('n', '<leader>fm', ffind.find_manpage)
 
 vim.keymap.set('n', '<leader>de', function()
 	vim.diagnostic.setqflist {
