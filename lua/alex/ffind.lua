@@ -116,7 +116,7 @@ end
 ---@param exclude_pattern? string
 ---@param gitignore boolean
 ---@param callback fun(files: string[])
-local function find_recursive_files(cwd, prefix, exclude_pattern, gitignore, callback)
+local function fetch_recursive_files(cwd, prefix, exclude_pattern, gitignore, callback)
 	prefix = prefix or ""
 	local cmd
 	if gitignore then
@@ -375,7 +375,7 @@ function M.find_file(config)
 		}
 		vim.cmd(table[winmode] .. path .. "/" .. line)
 	end
-	find_recursive_files(path, "", exclude_pattern, gitignore, function(files)
+	fetch_recursive_files(path, "", exclude_pattern, gitignore, function(files)
 		local entries = M.picker_entry.from_list(files)
 		M.open_picker(entries, {
 			on_select = on_select
