@@ -1,7 +1,7 @@
-local path = vim.fn.stdpath('config')
+local config_path = vim.fn.stdpath('config')
 vim.g.mapleader = ' '
 vim.keymap.set('n', '<leader>ee', ':Ex<CR>')
-vim.keymap.set('n', '<leader>ec', ':Ex ' .. path .. '<CR>')
+vim.keymap.set('n', '<leader>ec', ':Ex ' .. config_path .. '<CR>')
 vim.keymap.set('n', '<leader>;', [[mpA;<Esc>`p]])
 vim.keymap.set('n', '<leader>,', [[mpA,<Esc>`p]])
 vim.keymap.set('n', '<C-h>', '<C-w><C-h>')
@@ -50,19 +50,48 @@ vim.keymap.set('n', '<leader>fc', function()
 		gitignore = true,
 	}
 end)
+local ffind = require('alex.ffind')
 vim.keymap.set('n', '<leader>fr', function()
-	require('alex.ffind').find_file {
+	ffind.find_file {
 		cwd = os.getenv('HOME'),
 	}
 end)
 vim.keymap.set('n', '<leader>fg', function()
-	require('alex.ffind').grep_files {
+	ffind.grep_files {
 		exclude_pattern = vim.g.ffind_exclude_pattern,
 		gitignore = vim.g.ffind_gitignore == 1
 	}
 end)
-vim.keymap.set('n', '<leader>fh', function()
-	require('alex.ffind').find_help()
+vim.keymap.set('n', '<leader>fh', ffind.find_help)
+vim.keymap.set('n', '<leader>fo', ffind.document_symbols)
+vim.keymap.set('n', '<leader>fw', ffind.workspace_symbols)
+vim.keymap.set('n', '<leader>fm', function()
+	local cmd = { "apropos", ".*" }
+	local output = vim.system(cmd, { text = true }):wait().stdout
+	if output == nil then
+		error("couldn't grab manpages")
+	end
+	local entries = {}
+	for line in vim.gsplit(output, "\n") do
+		local entry, part = string.match(line, "^([^%s]+)%s([^%s]+)")
+		if entry then
+			table.insert(entries, ffind.picker_entry.new(entry .. part, nil))
+		end
+	end
+	local function on_select(selected, winmode)
+		if not selected then return end
+		if winmode ~= "none" then
+			local table = {
+				norm = "new",
+				vert = "vnew",
+			}
+			vim.cmd(table[winmode])
+		end
+		vim.cmd("hide Man " .. selected.text)
+	end
+	ffind.open_picker(entries, {
+		on_select = on_select
+	})
 end)
 
 vim.keymap.set('n', '<leader>de', function()
@@ -76,3 +105,19 @@ vim.keymap.set('n', '<leader>dw', function()
 	}
 end)
 vim.keymap.set('n', '<leader>da', vim.diagnostic.setqflist)
+vim.api.nvim_create_user_command("CSwitch", function()
+	local path = vim.api.nvim_buf_get_name(0)
+	local filename, extension = path:match([[/([^/]+)%.(%a+)$]])
+	if not filename then return end
+	local ext_table = {
+		["c"] = "h",
+		["h"] = "c",
+		["cpp"] = "hpp",
+		["hpp"] = "cpp",
+	}
+	local extension2 = ext_table[extension]
+	if extension2 == nil then return end
+	local files = vim.fn.findfile(filename .. "." .. extension2, "**/*", -1)
+	if #files ~= 1 then return end
+	vim.cmd("e " .. files[1])
+end, {})

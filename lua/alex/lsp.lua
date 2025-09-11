@@ -21,6 +21,7 @@ vim.api.nvim_create_user_command('LspRestart', function ()
 		local name = lsp.name
 		vim.lsp.enable(name, false)
 		vim.lsp.enable(name, true)
+		vim.notify("Restarted client [" .. name .. "]")
 	end
 end, { desc = "restarts all running language servers" })
 
