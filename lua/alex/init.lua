@@ -28,6 +28,18 @@ vim.api.nvim_create_autocmd('BufLeave', {
 		end
 	end
 })
+vim.api.nvim_create_autocmd('BufEnter', {
+	pattern = "*.md",
+	callback = function(_)
+		if vim.bo.filetype == 'markdown' then
+			vim.wo.spell = true
+			vim.wo.wrap = true
+			vim.wo.relativenumber = false
+			vim.keymap.set("n", "j", "gj", { buffer = true })
+			vim.keymap.set("n", "k", "gk", { buffer = true })
+		end
+	end
+})
 
 if 1 == vim.fn.executable 'hyprctl' then
 	---@diagnostic disable-next-line: unused-local, duplicate-set-field
