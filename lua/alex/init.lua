@@ -29,7 +29,7 @@ vim.api.nvim_create_autocmd('BufLeave', {
 	end
 })
 
-if 1 == vim.fn.executable "hyprctl" then
+if 1 == vim.fn.executable 'hyprctl' then
 	---@diagnostic disable-next-line: unused-local, duplicate-set-field
 	vim.notify = function(msg, level, opts)
 		level = level or vim.log.levels.OFF
