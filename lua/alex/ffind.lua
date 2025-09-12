@@ -450,6 +450,34 @@ function M.grep_files(config)
 	})
 end
 
+function M.find_buffer()
+	local buffers = vim.api.nvim_list_bufs()
+	local entries = {}
+	for _, buffer in ipairs(buffers) do
+		if vim.api.nvim_buf_is_loaded(buffer) then
+			local filename = vim.api.nvim_buf_get_name(buffer)
+			local text = ("%d %s"):format(buffer, filename)
+			local entry = M.picker_entry.new(text, buffer)
+			table.insert(entries, entry)
+		end
+	end
+	local function on_select(entry, winmode)
+		if not entry then return nil end
+		local buffer = entry.data
+		if winmode ~= "none" then
+			local table = {
+				norm = "new",
+				vert = "vnew",
+			}
+			vim.cmd(table[winmode])
+		end
+		vim.cmd.buffer(tostring(buffer))
+	end
+	M.open_picker(entries, {
+		on_select = on_select
+	})
+end
+
 local cached_help_entries = nil ---@type alex.ffind.PickerEntry[]
 
 function M.find_help()
