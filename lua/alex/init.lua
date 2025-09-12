@@ -1,6 +1,7 @@
 require('alex.lazy')
 require('alex.lsp')
 require('alex.floaterm').setup()
+vim.o.background = 'dark'
 vim.cmd.colorscheme('github_dark_default')
 vim.o.splitright = true
 vim.o.tabstop = 4

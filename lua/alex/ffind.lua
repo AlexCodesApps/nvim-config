@@ -612,4 +612,25 @@ function M.find_manpage()
 	})
 end
 
+local cached_colorschemes = nil
+function M.find_colorscheme()
+	if not cached_colorschemes then
+		cached_colorschemes = {}
+		local rtp = vim.o.runtimepath
+		for _, path in ipairs(vim.fn.globpath(rtp, "**/colors/*", false, true)) do
+			local name, ext = path:match("([^%./]+)%.([^%./]+)$")
+			if ext == "vim" or ext == "lua" and name then
+				table.insert(cached_colorschemes, M.picker_entry.new(name, nil))
+			end
+		end
+	end
+	local function on_select(selected, _)
+		if not selected then return end
+		vim.cmd.colorscheme(selected.text)
+	end
+	M.open_picker(cached_colorschemes, {
+		on_select = on_select
+	})
+end
+
 return M
