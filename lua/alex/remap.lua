@@ -66,6 +66,8 @@ vim.keymap.set('n', '<leader>fh', ffind.find_help)
 vim.keymap.set('n', '<leader>fo', ffind.document_symbols)
 vim.keymap.set('n', '<leader>fw', ffind.workspace_symbols)
 vim.keymap.set('n', '<leader>fm', ffind.find_manpage)
+vim.keymap.set('n', '<leader>fb', ffind.find_buffer)
+vim.keymap.set('n', '<leader>ft', ffind.find_colorscheme)
 
 vim.keymap.set('n', '<leader>de', function()
 	vim.diagnostic.setqflist {

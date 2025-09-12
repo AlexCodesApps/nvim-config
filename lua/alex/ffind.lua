@@ -54,8 +54,12 @@ local g_picker = nil ---@type alex.ffind.Picker?
 local function terminate_picker(selected)
 	if g_picker == nil then return end
 	vim.api.nvim_del_augroup_by_id(g_picker.augroup)
-	vim.api.nvim_win_close(g_picker.inner_window, true)
-	vim.api.nvim_win_close(g_picker.outer_window, true)
+	vim.api.nvim_buf_delete(g_picker.inner_winbuf, {
+		force = true
+	})
+	vim.api.nvim_buf_delete(g_picker.outer_winbuf, {
+		force = true
+	})
 	vim.cmd.stopinsert()
 	local on_cancel = g_picker.on_cancel
 	g_picker = nil
