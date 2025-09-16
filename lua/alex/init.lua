@@ -33,7 +33,7 @@ vim.api.nvim_create_autocmd('BufLeave', {
 	end
 })
 vim.api.nvim_create_autocmd('BufEnter', {
-	pattern = "*.md",
+	pattern = os.getenv("HOME") .. "/Documents/**/*.md",
 	callback = function(_)
 		if vim.bo.filetype == 'markdown' then
 			vim.wo.spell = true
