@@ -126,7 +126,7 @@ local function fetch_recursive_files(cwd, prefix, exclude_pattern, gitignore, ca
 	if gitignore then
 		cmd = { "rg", "--files" }
 	else
-		cmd = { "rg", "-uuu", "--files" }
+		cmd = { "rg", "--no-ignore", "--files" }
 	end
 	vim.system(cmd, {
 		cwd = cwd,
