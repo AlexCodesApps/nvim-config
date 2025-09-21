@@ -97,3 +97,10 @@ vim.api.nvim_create_user_command("CSwitch", function()
 	if #files ~= 1 then return end
 	vim.cmd("e " .. files[1])
 end, {})
+vim.api.nvim_create_user_command("Pad", function(tbl)
+	local count = tonumber(tbl.args)
+	local fmt = [[s/.*/\=printf('%-]] .. count .. [[s', submatch(0))]]
+	local cmd = vim.api.nvim_parse_cmd(fmt, {})
+	cmd.range = { tbl.line1, tbl.line2 }
+	vim.cmd(cmd)
+end, { desc = "Align input lines", nargs = 1, range = true })

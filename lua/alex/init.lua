@@ -21,14 +21,11 @@ vim.g.ffind_gitignore = 1
 vim.o.completeopt = "menuone,noinsert,fuzzy"
 vim.o.indentexpr = "nvim_treesitter#indent()"
 vim.o.showtabline = 0
+vim.o.shortmess = vim.o.shortmess .. "I"
 vim.api.nvim_create_autocmd('BufLeave', {
 	callback = function(ev)
 		if vim.bo[ev.buf].buftype == 'quickfix' then
 			vim.api.nvim_buf_delete(ev.buf, {})
-		elseif vim.bo[ev.buf].filetype == 'markdown' then
-			vim.wo.spell = false
-			vim.wo.wrap = false
-			vim.wo.relativenumber = true
 		end
 	end
 })
@@ -36,9 +33,9 @@ vim.api.nvim_create_autocmd('BufEnter', {
 	pattern = os.getenv("HOME") .. "/Documents/**/*.md",
 	callback = function(_)
 		if vim.bo.filetype == 'markdown' then
-			vim.wo.spell = true
-			vim.wo.wrap = true
-			vim.wo.relativenumber = false
+			vim.o.spell = true
+			vim.o.wrap = true
+			vim.o.relativenumber = false
 			vim.keymap.set("n", "j", "gj", { buffer = true })
 			vim.keymap.set("n", "k", "gk", { buffer = true })
 		end

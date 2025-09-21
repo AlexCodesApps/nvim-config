@@ -1,5 +1,5 @@
 return  {
-	cmd = { 'clangd', '--background-index=false', '--header-insertion=never', '--function-arg-placeholders=-1'},
+	cmd = { 'clangd', '--background-index', '--header-insertion=never', '--function-arg-placeholders=-1'},
 	filetypes = { 'c', 'cpp' },
 	root_markers = {
 		'.clangd',

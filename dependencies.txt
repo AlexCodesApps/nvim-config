@@ -5,3 +5,4 @@ typescript-language-server
 vscode-css-language-server
 vscode-html-language-server
 emmet-language-server
+jedi-language-server

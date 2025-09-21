@@ -1,4 +1,4 @@
-vim.diagnostic.config{ virtual_text = true }
+vim.diagnostic.config { virtual_text = true }
 
 local filetype_tabsize_table = {
 	html = 2,
@@ -32,3 +32,4 @@ vim.lsp.enable('vscode_html_lsp')
 vim.lsp.enable('clangd')
 vim.lsp.enable('emmet_language_server')
 vim.lsp.enable('rust-analyzer')
+vim.lsp.enable('jedi_language_server')
