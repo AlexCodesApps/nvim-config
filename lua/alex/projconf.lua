@@ -6,14 +6,14 @@ local fs_stat = (vim.uv or vim.loop).fs_stat
 ---@param path string
 ---@return string
 local function path_to_hash(path)
-	local s, _ = path:gsub("#", "#h"):gsub("/", "#b")
+	local s, _ = path:gsub("#", "#h"):gsub("/", "#a"):gsub("\\", "#b")
 	return s
 end
 
 ---@param hash string
 ---@return string
 local function hash_to_path(hash)
-	local s, _ = hash:gsub("#b", "/"):gsub("#h", "#")
+	local s, _ = hash:gsub("#a", "/"):gsub("#b", "\\"):gsub("#h", "#")
 	return s
 end
 
