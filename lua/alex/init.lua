@@ -64,3 +64,4 @@ if 1 == vim.fn.executable 'hyprctl' then
 		}
 	end
 end
+require("alex.projconf").setup()

@@ -356,6 +356,17 @@ function M.default_sorter(entries, input, callback)
 	}))
 end
 
+---@param winmode alex.ffind.WinMode
+---@param path string
+local function edit_file(winmode, path)
+		local table = {
+			none = "e ",
+			norm = "new ",
+			vert = "vnew ",
+		}
+		vim.cmd(table[winmode] .. vim.fn.fnameescape(path))
+end
+
 ---@class alex.ffind.FindFileConfig
 ---@field cwd? string
 ---@field exclude_pattern? string
@@ -372,12 +383,7 @@ function M.find_file(config)
 	local function on_select(entry, winmode)
 		if not entry then return end
 		local line = entry.text
-		local table = {
-			none = "e ",
-			norm = "new ",
-			vert = "vnew ",
-		}
-		vim.cmd(table[winmode] .. path .. "/" .. line)
+		edit_file(winmode, path .. "/" .. line)
 	end
 	fetch_recursive_files(path, "", exclude_pattern, gitignore, function(files)
 		local entries = M.picker_entry.from_list(files)
@@ -438,12 +444,7 @@ function M.grep_files(config)
 	local function on_select(entry, winmode)
 		if not entry then return end
 		local file = entry.data.file
-		local table = {
-			none = "e ",
-			norm = "new ",
-			vert = "vnew ",
-		}
-		vim.cmd(table[winmode] .. file)
+		edit_file(winmode, file)
 		local row = entry.data.row
 		vim.api.nvim_win_set_cursor(0, {row, 0})
 	end

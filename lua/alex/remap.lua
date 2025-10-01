@@ -95,7 +95,7 @@ vim.api.nvim_create_user_command("CSwitch", function()
 	if extension2 == nil then return end
 	local files = vim.fn.findfile(filename .. "." .. extension2, "**/*", -1)
 	if #files ~= 1 then return end
-	vim.cmd("e " .. files[1])
+	vim.cmd("e " .. vim.fn.fnameescape(files[1]))
 end, {})
 vim.api.nvim_create_user_command("Pad", function(tbl)
 	local count = tonumber(tbl.args)
