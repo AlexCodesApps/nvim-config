@@ -97,6 +97,62 @@ vim.api.nvim_create_user_command("CSwitch", function()
 	if #files ~= 1 then return end
 	vim.cmd("e " .. vim.fn.fnameescape(files[1]))
 end, {})
+
+vim.api.nvim_create_user_command("MkMdTable", function(opts)
+	local input = vim.api.nvim_buf_get_lines(0, opts.line1 - 1, opts.line2, true)
+	if #input < 2 then return end
+	local header = input[1]
+	table.remove(input, 1)
+	local header_list = vim.split(header, "|")
+	local width = #header_list
+	if width < 1 then return end
+	local tbl = {}
+	local padtbl = vim.tbl_map(string.len, header_list)
+	for i=1, #input do
+		local line = input[i]
+		local items = vim.split(line, "|")
+		if #items ~= width then
+			vim.notify("Width of table is not regular!")
+			return
+		end
+		for j=1,width do
+			padtbl[j] =
+				math.max(padtbl[j], items[j]:len())
+		end
+		tbl[i] = items
+	end
+	local function print_row(row)
+		local o = ""
+		for i=1, #row do
+			local str = row[i]
+			local mwidth = padtbl[i]
+			local pad = mwidth - str:len() + 1
+			for _=1,pad do
+				str = str .. " "
+			end
+			o = o .. "| " .. str
+		end
+		o = o .. "|"
+		return o
+	end
+	local output = {
+		print_row(header_list)
+	}
+	local sep = "|"
+	for _, itemw in ipairs(padtbl) do
+		sep = sep .. "-"
+		for _=1,itemw do
+			sep = sep .. "-"
+		end
+		sep = sep .. "-|"
+	end
+	table.insert(output, sep)
+	for _, row in ipairs(tbl) do
+		table.insert(output, print_row(row))
+	end
+	vim.api.nvim_buf_set_lines(0, opts.line1 - 1, opts.line2, true, output)
+end, { desc = "Make markdown table", range = true })
+
 vim.api.nvim_create_user_command("Pad", function(tbl)
 	local count = tonumber(tbl.args)
 	local fmt = [[s/.*/\=printf('%-]] .. count .. [[s', submatch(0))]]
