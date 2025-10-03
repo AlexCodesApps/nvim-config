@@ -153,6 +153,21 @@ vim.api.nvim_create_user_command("MkMdTable", function(opts)
 	vim.api.nvim_buf_set_lines(0, opts.line1 - 1, opts.line2, true, output)
 end, { desc = "Make markdown table", range = true })
 
+vim.api.nvim_create_user_command("UnMkMdTable", function(opts)
+	local input = vim.api.nvim_buf_get_lines(0, opts.line1 - 1, opts.line2, true)
+	if #input < 3 then return end
+	table.remove(input, 2)
+	local output = vim.tbl_map(function(line)
+		if line:sub(1, 1) ~= "|" or line:sub(#line) ~= "|" then
+			vim.notify("Invalid syntax")
+			return
+		end
+		local out, _ = line:sub(2, #line - 2):gsub("%s", "")
+		return out
+	end, input)
+	vim.api.nvim_buf_set_lines(0, opts.line1 - 1, opts.line2, true, output)
+end, { desc = "Unmake markdown table", range = true })
+
 vim.api.nvim_create_user_command("Pad", function(tbl)
 	local count = tonumber(tbl.args)
 	local fmt = [[s/.*/\=printf('%-]] .. count .. [[s', submatch(0))]]
