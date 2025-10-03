@@ -158,12 +158,13 @@ vim.api.nvim_create_user_command("UnMkMdTable", function(opts)
 	if #input < 3 then return end
 	table.remove(input, 2)
 	local output = vim.tbl_map(function(line)
-		if line:sub(1, 1) ~= "|" or line:sub(#line) ~= "|" then
+		if line:sub(1, 1) ~= "|" or line:sub(line:len()) ~= "|" then
 			vim.notify("Invalid syntax")
 			return
 		end
-		local out, _ = line:sub(2, #line - 2):gsub("%s", "")
-		return out
+		return line
+			:gsub("%s*|%s*", "|")
+			:match("^|(.*)|$")
 	end, input)
 	vim.api.nvim_buf_set_lines(0, opts.line1 - 1, opts.line2, true, output)
 end, { desc = "Unmake markdown table", range = true })
