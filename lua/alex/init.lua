@@ -43,8 +43,8 @@ vim.api.nvim_create_autocmd('BufEnter', {
 })
 
 if 1 == vim.fn.executable 'hyprctl' then
-	---@diagnostic disable-next-line: unused-local, duplicate-set-field
-	vim.notify = function(msg, level, opts)
+	---@diagnostic disable-next-line: duplicate-set-field
+	vim.notify = function(msg, level, _)
 		level = level or vim.log.levels.OFF
 		local table = {
 			[vim.log.levels.WARN] = { icon = '0', color = 'rgb(FFFF00)' },
@@ -53,7 +53,6 @@ if 1 == vim.fn.executable 'hyprctl' then
 		local info = table[level] or {}
 		local icon = info.icon or '1'
 		local color = info.color or "rbg(0000FF)"
-		local _ = opts
 		vim.system {
 			'hyprctl',
 			'notify',
@@ -64,4 +63,5 @@ if 1 == vim.fn.executable 'hyprctl' then
 		}
 	end
 end
+
 require("alex.projconf").setup()
