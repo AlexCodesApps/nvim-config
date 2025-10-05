@@ -80,10 +80,30 @@ M.hash_to_path = hash_to_path
 M.cleanup = cleanup
 
 function M.setup()
-	vim.api.nvim_create_user_command("ProjConfEdit", edit_config, {})
-	vim.api.nvim_create_user_command("ProjConfLoad", load_config, {})
-	vim.api.nvim_create_user_command("ProjConfDelete", delete_config, {})
-	vim.api.nvim_create_user_command("ProjConfCleanup", cleanup, {})
+	vim.api.nvim_create_user_command("ProjConf", function(opts)
+		local cmd = opts.fargs[1]
+		local actions = {
+			edit = edit_config,
+			load = load_config,
+			delete = delete_config,
+			cleanup = cleanup
+		}
+		local action = actions[cmd]
+		if action then
+			action()
+		else
+			vim.notify(("Invalid projconf command '%s'"):format(cmd), vim.log.levels.ERROR)
+		end
+	end, {
+		nargs = 1,
+		complete = function(arg, _, _)
+			local pattern = "^" .. arg
+			local entries = { "edit", "load", "delete", "cleanup" }
+			return vim.tbl_filter(function(entry)
+				return entry:match(pattern)
+			end, entries)
+		end,
+	})
 	if not os.getenv("PROJCONF_SUPPRESS") then
 		load_config()
 	end
