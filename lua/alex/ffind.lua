@@ -32,89 +32,6 @@ function M.picker_entry.from_list(list)
 	return vim.tbl_map(helper, list)
 end
 
----@class alex.ffind.Picker
----@field outer_window integer -- The window for displaying matches
----@field outer_winbuf integer -- The buffer for displaying matches
----@field inner_window integer -- The window for user input
----@field inner_winbuf integer -- The buffer for user input
----@field augroup integer -- The augroup for autocmds run in the picker
----						  -- This group is deleted on picker closing
----@field lines alex.ffind.PickerEntry[]
----@field fzlines alex.ffind.PickerEntry[]
----@field screen_lines string[]
----@field screen_offset integer
----@field screen_cursor_offset integer
----@field sorter alex.ffind.SortFn
----@field on_cancel? fun(selected: boolean)
----@field schedule_id integer
-
-local g_picker = nil ---@type alex.ffind.Picker?
-
----@param selected? boolean
-local function terminate_picker(selected)
-	if g_picker == nil then return end
-	vim.api.nvim_del_augroup_by_id(g_picker.augroup)
-	vim.api.nvim_buf_delete(g_picker.inner_winbuf, {
-		force = true
-	})
-	vim.api.nvim_buf_delete(g_picker.outer_winbuf, {
-		force = true
-	})
-	vim.cmd.stopinsert()
-	local on_cancel = g_picker.on_cancel
-	g_picker = nil
-	if on_cancel then on_cancel(selected or false) end
-end
-
-local function get_cursor_offset()
-	assert(g_picker)
-	return g_picker.screen_offset + g_picker.screen_cursor_offset
-end
-
----@return integer
-local function get_max_lines()
-	assert(g_picker)
-	return vim.api.nvim_win_get_height(g_picker.outer_window)
-end
-
----@return integer
-local function get_line_count()
-	assert(g_picker)
-	return vim.api.nvim_buf_line_count(g_picker.outer_winbuf)
-end
-
----@return string[]
-local function get_picker_lines()
-	assert(g_picker)
-	local lines = g_picker.fzlines
-	local outer_height = get_max_lines()
-	local min = math.min(#lines, outer_height)
-	local nlines = {} ---@type string[]
-	for i = min, 1, -1 do
-		table.insert(nlines, lines[i].text)
-	end
-	return nlines
-end
-
-local function print_picker_lines()
-	assert(g_picker)
-	vim.api.nvim_buf_set_lines(
-		g_picker.outer_winbuf,
-		0,
-		-1,
-		false,
-		g_picker.screen_lines
-	)
-end
-
-local function reset_picker_lines()
-	assert(g_picker)
-	g_picker.screen_offset = 0
-	g_picker.screen_cursor_offset = 0
-	g_picker.screen_lines = get_picker_lines()
-	print_picker_lines()
-end
-
 ---@param cwd string
 ---@param prefix? string
 ---@param exclude_pattern? string
@@ -143,120 +60,94 @@ local function fetch_recursive_files(cwd, prefix, exclude_pattern, gitignore, ca
 	end)
 end
 
-local function screen_cursor_offset_check(offset)
-	assert(g_picker)
-	local max = get_line_count()
-	local index = max - offset
-	if index > max or index < 1 then
-		return nil
-	end
-	return index
-end
-
-local scroll_screen_up
-local scroll_screen_down
-
-local function print_screen_cursor()
-	assert(g_picker)
-	local index = screen_cursor_offset_check(g_picker.screen_cursor_offset)
-	assert(index)
-	vim.api.nvim_win_set_cursor(g_picker.outer_window, { index, 0 })
-end
-
---- Run on user input change
-local function reset_fzlines()
-	assert(g_picker)
-	local input = vim.api.nvim_get_current_line()
-	if input == "" then
-		g_picker.fzlines = g_picker.lines
-		reset_picker_lines()
-		print_screen_cursor()
-		return
-	end
-	local schedule_id = g_picker.schedule_id
-	g_picker.schedule_id = g_picker.schedule_id + 1
-	g_picker.sorter(g_picker.lines, input, function(fzlines)
-		if not g_picker then return end
-		if schedule_id + 1 == g_picker.schedule_id then -- to avoid time travelling
-			g_picker.fzlines = fzlines
-			reset_picker_lines()
-			print_screen_cursor()
+---@param list alex.ffind.PickerEntry[]
+---@param begin integer
+---@param max integer
+---@return alex.ffind.PickerEntry[]
+local function lazy_reverse(list)
+	local iter = coroutine.wrap(function()
+		for i=#list, 1, -1 do
+			coroutine.yield(list[i])
 		end
 	end)
+	local lastset = 0
+	return setmetatable({}, {
+		---@param key integer
+		__index = function(self, key)
+			for i=lastset+1,key do
+				rawset(self, i, iter())
+			end
+			lastset = key
+			return rawget(self, key)
+		end,
+		__newindex = error,
+		__len = function(self) return #list end,
+	})
 end
 
-local function move_cursor_up()
+---@class alex.ffind.Picker
+---@field outer { win: integer, buf: integer }
+---@field inner { win: integer, buf: integer }
+---@field augroup integer
+---@field entries alex.ffind.PickerEntry[]
+---@field on_select fun(selected: alex.ffind.PickerEntry?, winmode: alex.ffind.WinMode): any
+---@field sorter alex.ffind.SortFn
+---@field on_cancel? fun(selected: boolean)
+---@field state { filtered: alex.ffind.PickerEntry[], shown: alex.ffind.PickerEntry[], c_offset: integer, s_offset: integer }
+
+---@type alex.ffind.Picker?
+local g_picker = nil
+
+---@param selected? boolean
+local function terminate_picker(selected)
+	if not g_picker then return end
+	vim.api.nvim_del_augroup_by_id(g_picker.augroup)
+	vim.api.nvim_buf_delete(g_picker.inner.buf, {
+		force = true
+	})
+	vim.api.nvim_buf_delete(g_picker.outer.buf, {
+		force = true
+	})
+	vim.cmd.stopinsert()
+	local on_cancel = g_picker.on_cancel
+	g_picker = nil
+	if on_cancel then on_cancel(selected or false) end
+end
+
+local function get_picker_input()
+	return vim.api.nvim_get_current_line()
+end
+
+local function picker_entry_window_height()
 	assert(g_picker)
-	if get_cursor_offset() + 1 == #g_picker.fzlines then return end
-	if screen_cursor_offset_check(g_picker.screen_cursor_offset + 1) then
-		g_picker.screen_cursor_offset = g_picker.screen_cursor_offset + 1
+	return vim.api.nvim_win_get_height(g_picker.outer.win) - 1
+end
+
+local function picker_draw()
+
+end
+
+local function reset_picker_window()
+	assert(g_picker)
+	local input = get_picker_input()
+	local function draw()
+		g_picker.state.c_offset = 0
+		g_picker.state.s_offset = 0
+	end
+	if input ~= "" then
+		g_picker.sorter(g_picker.entries, input, function(entries)
+			g_picker.state.filtered = entries
+			draw()
+		end)
 	else
-		scroll_screen_up(true)
+		g_picker.state.filtered = g_picker.entries
+		draw()
 	end
-	print_screen_cursor()
-end
-
-local function move_cursor_down()
-	assert(g_picker)
-	if get_cursor_offset() == 0 then return end
-	if screen_cursor_offset_check(g_picker.screen_cursor_offset - 1) then
-		g_picker.screen_cursor_offset = g_picker.screen_cursor_offset - 1
-	else
-		scroll_screen_down(true)
-	end
-	print_screen_cursor()
-end
-
----@param move_cursor? boolean
-scroll_screen_up = function(move_cursor)
-	assert(g_picker)
-	if #g_picker.screen_lines + g_picker.screen_offset + 1 >= #g_picker.fzlines then
-		return
-	end
-	g_picker.screen_offset = g_picker.screen_offset + 1
-	local new_line = g_picker.fzlines[g_picker.screen_offset + #g_picker.screen_lines].text
-	table.remove(g_picker.screen_lines, #g_picker.screen_lines)
-	table.insert(g_picker.screen_lines, 1, new_line)
-	print_picker_lines()
-	if not move_cursor then
-		if screen_cursor_offset_check(g_picker.screen_cursor_offset - 1) then
-			g_picker.screen_cursor_offset = g_picker.screen_cursor_offset - 1
-		end
-		print_screen_cursor()
-	end
-end
-
----@param move_cursor? boolean
-scroll_screen_down = function(move_cursor)
-	assert(g_picker)
-	if g_picker.screen_offset <= 0 then
-		return
-	end
-	g_picker.screen_offset = g_picker.screen_offset - 1
-	local new_line = g_picker.fzlines[g_picker.screen_offset + 1].text
-	table.remove(g_picker.screen_lines, 1)
-	table.insert(g_picker.screen_lines, new_line)
-	print_picker_lines()
-	if not move_cursor then
-		if screen_cursor_offset_check(g_picker.screen_cursor_offset + 1) then
-			g_picker.screen_cursor_offset = g_picker.screen_cursor_offset + 1
-		end
-		print_screen_cursor()
-	end
-end
-
----@return alex.ffind.PickerEntry?
-local function get_selected_field()
-	assert(g_picker)
-	if #g_picker.fzlines == 0 then
-		return nil
-	end
-	return g_picker.fzlines[1 + get_cursor_offset()]
 end
 
 ---@class alex.ffind.OpenPickerConfig
 ---@field on_select fun(selected: alex.ffind.PickerEntry?, winmode: alex.ffind.WinMode): any
----@field sorter? fun(lines: string[], input: string): string[]
+---@field sorter? alex.ffind.SortFn
 ---@field on_cancel? fun(selected: boolean)
 
 ---@param lines alex.ffind.PickerEntry[]
@@ -265,7 +156,6 @@ function M.open_picker(lines, config)
 	local on_select = config.on_select
 	local sorter = config.sorter or M.default_sorter
 	local on_cancel = config.on_cancel
-	terminate_picker()
 	local outer_winbuf = vim.api.nvim_create_buf(false, true)
 	local inner_winbuf = vim.api.nvim_create_buf(false, true)
 	local outer_window = vim.api.nvim_open_win(outer_winbuf, false, {
@@ -290,6 +180,21 @@ function M.open_picker(lines, config)
 	local augroup = vim.api.nvim_create_augroup("alex.ffind", {
 		clear = true
 	})
+	g_picker = {
+		inner = { win = inner_window, buf = inner_winbuf },
+		outer = { win = outer_window, buf = outer_winbuf },
+		augroup = augroup,
+		entries = lines,
+		on_select = on_select,
+		sorter = sorter,
+		on_cancel = on_cancel,
+		state = {
+			filtered = {},
+			shown = {},
+			c_offset = 0,
+			s_offset = 0,
+		}
+	}
 	vim.wo[outer_window].cursorline = true
 	vim.wo.winhl = "Normal:Alex.FFind"
 	vim.api.nvim_set_hl(0, "Alex.FFind", { bg = "#202040" })
@@ -302,50 +207,33 @@ function M.open_picker(lines, config)
 		group = augroup,
 		callback = terminate_picker,
 	})
-	g_picker = {
-		outer_window = outer_window,
-		outer_winbuf = outer_winbuf,
-		inner_window = inner_window,
-		inner_winbuf = inner_winbuf,
-		augroup = augroup,
-		lines = lines,
-		fzlines = lines,
-		screen_lines = {},
-		screen_offset = 0,
-		sorter = sorter,
-		on_cancel = on_cancel,
-		screen_cursor_offset = 0,
-		schedule_id = 0,
-	}
 	vim.api.nvim_create_autocmd({ "TextChanged", "TextChangedI" }, {
 		group = augroup,
 		buffer = inner_winbuf,
-		callback = reset_fzlines,
+		callback = reset_picker_window,
 	})
 	vim.keymap.set("n", "<Esc>", terminate_picker, { buffer = true })
-	vim.keymap.set({ "n", "i" }, "<Enter>", function()
-		local result = get_selected_field()
-		terminate_picker(true)
-		on_select(result, "none")
-	end, { buffer = true })
-	vim.keymap.set({ "n", "i" }, "<C-v>", function()
-		local result = get_selected_field()
-		terminate_picker(true)
-		on_select(result, "vert")
-	end, { buffer = true })
-	vim.keymap.set({ "n", "i" }, "<C-n>", function()
-		local result = get_selected_field()
-		terminate_picker(true)
-		on_select(result, "norm")
-	end, { buffer = true })
-	vim.keymap.set("n", "k", move_cursor_up, { buffer = true })
-	vim.keymap.set("n", "j", move_cursor_down, { buffer = true })
-	vim.keymap.set("i", "<C-k>", move_cursor_up, { buffer = true })
-	vim.keymap.set("i", "<C-j>", move_cursor_down, { buffer = true })
-	vim.keymap.set({"n", "i"}, "<C-y>", scroll_screen_up, { buffer = true })
-	vim.keymap.set({"n", "i"}, "<C-e>", scroll_screen_down, { buffer = true })
-	reset_picker_lines()
-	print_screen_cursor()
+	-- vim.keymap.set({ "n", "i" }, "<Enter>", function()
+	-- 	local result = get_selected_field()
+	-- 	terminate_picker(true)
+	-- 	on_select(result, "none")
+	-- end, { buffer = true })
+	-- vim.keymap.set({ "n", "i" }, "<C-v>", function()
+	-- 	local result = get_selected_field()
+	-- 	terminate_picker(true)
+	-- 	on_select(result, "vert")
+	-- end, { buffer = true })
+	-- vim.keymap.set({ "n", "i" }, "<C-n>", function()
+	-- 	local result = get_selected_field()
+	-- 	terminate_picker(true)
+	-- 	on_select(result, "norm")
+	-- end, { buffer = true })
+	-- vim.keymap.set("n", "k", move_cursor_up, { buffer = true })
+	-- vim.keymap.set("n", "j", move_cursor_down, { buffer = true })
+	-- vim.keymap.set("i", "<C-k>", move_cursor_up, { buffer = true })
+	-- vim.keymap.set("i", "<C-j>", move_cursor_down, { buffer = true })
+	-- vim.keymap.set({"n", "i"}, "<C-y>", scroll_screen_up, { buffer = true })
+	-- vim.keymap.set({"n", "i"}, "<C-e>", scroll_screen_down, { buffer = true })
 	vim.cmd.startinsert()
 end
 
