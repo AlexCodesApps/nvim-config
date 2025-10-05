@@ -584,22 +584,38 @@ function M.workspace_symbols()
 	})
 end
 
-local cached_manpages_entries = nil
+local manpage_promise = nil
 function M.find_manpage()
-	if not cached_manpages_entries then
-		local cmd = { "apropos", ".*" }
-		local output = vim.system(cmd, { text = true }):wait().stdout
-		if output == nil then
-			error("couldn't grab manpages")
-		end
-		local entries = {}
-		for line in vim.gsplit(output, "\n") do
-			local entry, part = string.match(line, "^([^%s]+)%s([^%s]+)")
-			if entry then
-				table.insert(entries, M.picker_entry.new(entry .. part, nil))
+	local function fetch_manpage_entries(callback)
+		if manpage_promise ~= nil then
+			if not manpage_promise.result then
+				table.insert(manpage_promise.listeners, callback)
+			else
+				callback(manpage_promise.result)
 			end
+			return
 		end
-		cached_manpages_entries = entries
+		manpage_promise = {
+			listeners = { callback },
+			result = nil,
+		}
+		vim.system({ "apropos", ".*" }, { text = true }, function(obj)
+			if obj.stdout == nil then
+				error("couldn't grab manpages")
+			end
+			local entries = {}
+			for line in vim.gsplit(obj.stdout, "\n") do
+				local entry, part = string.match(line, "^([^%s]+)%s([^%s]+)")
+				if entry then
+					table.insert(entries, M.picker_entry.new(entry .. part, nil))
+				end
+			end
+			manpage_promise.result = entries
+			for _, listener in ipairs(manpage_promise.listeners) do
+				vim.schedule(function() listener(entries) end)
+			end
+			manpage_promise.listeners = nil
+		end)
 	end
 	local function on_select(selected, winmode)
 		if not selected then return end
@@ -612,9 +628,11 @@ function M.find_manpage()
 		end
 		vim.cmd("hide Man " .. selected.text)
 	end
-	M.open_picker(cached_manpages_entries, {
-		on_select = on_select
-	})
+	fetch_manpage_entries(function(entries)
+		M.open_picker(entries, {
+			on_select = on_select
+		})
+	end)
 end
 
 local cached_colorschemes = nil
