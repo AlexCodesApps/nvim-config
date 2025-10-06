@@ -6,9 +6,9 @@ local M = {}
 M.picker_entry = {}
 
 ---@alias alex.ffind.SortFn fun(
-	--- entries: alex.ffind.PickerEntry[], -- The entries to be sorted
-	--- input: string, -- The current user input
-	--- callback: fun(lines: alex.ffind.PickerEntry[])) -- Callback to be run, allowing asynchronous execution
+--- entries: alex.ffind.PickerEntry[], -- The entries to be sorted
+--- input: string, -- The current user input
+--- callback: fun(lines: alex.ffind.PickerEntry[])) -- Callback to be run, allowing asynchronous execution
 
 ---@param text string
 ---@param data any
@@ -60,31 +60,6 @@ local function fetch_recursive_files(cwd, prefix, exclude_pattern, gitignore, ca
 	end)
 end
 
----@param list alex.ffind.PickerEntry[]
----@param begin integer
----@param max integer
----@return alex.ffind.PickerEntry[]
-local function lazy_reverse(list)
-	local iter = coroutine.wrap(function()
-		for i=#list, 1, -1 do
-			coroutine.yield(list[i])
-		end
-	end)
-	local lastset = 0
-	return setmetatable({}, {
-		---@param key integer
-		__index = function(self, key)
-			for i=lastset+1,key do
-				rawset(self, i, iter())
-			end
-			lastset = key
-			return rawget(self, key)
-		end,
-		__newindex = error,
-		__len = function(self) return #list end,
-	})
-end
-
 ---@class alex.ffind.Picker
 ---@field outer { win: integer, buf: integer }
 ---@field inner { win: integer, buf: integer }
@@ -93,7 +68,7 @@ end
 ---@field on_select fun(selected: alex.ffind.PickerEntry?, winmode: alex.ffind.WinMode): any
 ---@field sorter alex.ffind.SortFn
 ---@field on_cancel? fun(selected: boolean)
----@field state { filtered: alex.ffind.PickerEntry[], shown: alex.ffind.PickerEntry[], c_offset: integer, s_offset: integer }
+---@field state { filtered: alex.ffind.PickerEntry[], c_offset: integer, s_offset: integer, sync_handle: any }
 
 ---@type alex.ffind.Picker?
 local g_picker = nil
@@ -120,22 +95,61 @@ end
 
 local function picker_entry_window_height()
 	assert(g_picker)
-	return vim.api.nvim_win_get_height(g_picker.outer.win) - 1
+	return vim.api.nvim_win_get_height(g_picker.outer.win)
+end
+
+local function picker_screen_offset_min()
+	return 0
+end
+
+local function picker_screen_offset_max()
+	assert(g_picker)
+	local sheight = picker_entry_window_height()
+	return math.max(#g_picker.state.filtered - sheight, 0)
+end
+
+local function picker_cursor_offset_min()
+	return 0
+end
+
+local function picker_cursor_offset_max()
+	assert(g_picker)
+	return math.min(picker_entry_window_height(), #g_picker.state.filtered) - 1
 end
 
 local function picker_draw()
-
+	assert(g_picker)
+	local screen_lines = {}
+	local sheight = picker_entry_window_height()
+	local nentry = math.min(sheight, #g_picker.state.filtered - g_picker.state.s_offset)
+	for i = nentry, 1, -1 do
+		table.insert(screen_lines, g_picker.state.filtered[i + g_picker.state.s_offset].text)
+	end
+	vim.api.nvim_buf_set_lines(g_picker.outer.buf, 0, -1, false, screen_lines)
+	local cursor_pos
+	if nentry ~= 0 then
+		cursor_pos = { math.max(nentry - g_picker.state.c_offset, 1), 0 }
+	else
+		cursor_pos = { 1, 0 }
+	end
+	vim.api.nvim_win_set_cursor(g_picker.outer.win, cursor_pos)
 end
 
 local function reset_picker_window()
 	assert(g_picker)
 	local input = get_picker_input()
 	local function draw()
-		g_picker.state.c_offset = 0
-		g_picker.state.s_offset = 0
+		g_picker.state.s_offset = picker_screen_offset_min()
+		g_picker.state.c_offset = picker_cursor_offset_min()
+		picker_draw()
 	end
 	if input ~= "" then
+		local sync_handle = {}
+		g_picker.state.sync_handle = sync_handle
 		g_picker.sorter(g_picker.entries, input, function(entries)
+			if not g_picker or g_picker.state.sync_handle ~= sync_handle then
+				return
+			end
 			g_picker.state.filtered = entries
 			draw()
 		end)
@@ -145,14 +159,118 @@ local function reset_picker_window()
 	end
 end
 
+local function move_cursor_up()
+	assert(g_picker)
+	local cmax = picker_cursor_offset_max()
+	local smax = picker_screen_offset_max()
+	if g_picker.state.c_offset == cmax then
+		if g_picker.state.s_offset == smax then
+			return
+		end
+		g_picker.state.s_offset = g_picker.state.s_offset + 1
+		picker_draw()
+		return
+	end
+	g_picker.state.c_offset = g_picker.state.c_offset + 1
+	picker_draw()
+end
+
+local function move_cursor_down()
+	assert(g_picker)
+	local cmin = picker_cursor_offset_min()
+	local smin = picker_screen_offset_min()
+	if g_picker.state.c_offset == cmin then
+		if g_picker.state.s_offset == smin then
+			return
+		end
+		g_picker.state.s_offset = g_picker.state.s_offset - 1
+		picker_draw()
+		return
+	end
+	g_picker.state.c_offset = g_picker.state.c_offset - 1
+	picker_draw()
+end
+
+local function scroll_screen_up()
+	assert(g_picker)
+	local smax = picker_screen_offset_max()
+	if g_picker.state.s_offset == smax then
+		return
+	end
+	g_picker.state.s_offset = g_picker.state.s_offset + 1
+	picker_draw()
+end
+
+local function scroll_screen_down()
+	assert(g_picker)
+	local smin = picker_screen_offset_min()
+	if g_picker.state.s_offset == smin then
+		return
+	end
+	g_picker.state.s_offset = g_picker.state.s_offset - 1
+	picker_draw()
+end
+
+---@return alex.ffind.PickerEntry?
+local function get_selected_field()
+	assert(g_picker)
+	return g_picker.state.filtered[g_picker.state.s_offset + g_picker.state.c_offset + 1]
+end
+
+local function run(winmode)
+	return function()
+		assert(g_picker)
+		local selected = get_selected_field()
+		local on_select = g_picker.on_select
+		terminate_picker(true)
+		on_select(selected, winmode)
+	end
+end
+
+local function move_screen_cursor_top()
+	assert(g_picker)
+	g_picker.state.s_offset = picker_screen_offset_max()
+	g_picker.state.c_offset = picker_cursor_offset_max()
+	picker_draw()
+end
+
+local function get_scroll()
+	assert(g_picker)
+	local sheight = picker_entry_window_height()
+	return math.min(sheight - 1, vim.wo[g_picker.outer.win].scroll)
+end
+
+local function scroll_screen_up_u()
+	assert(g_picker)
+	local smax = picker_screen_offset_max()
+	local new_offset = g_picker.state.s_offset + get_scroll()
+	g_picker.state.s_offset = math.min(smax, new_offset)
+	picker_draw()
+end
+
+local function scroll_screen_down_d()
+	assert(g_picker)
+	local smin = picker_screen_offset_min()
+	local new_offset = g_picker.state.s_offset - get_scroll()
+	g_picker.state.s_offset = math.max(smin, new_offset)
+	picker_draw()
+end
+
+local function move_screen_cursor_bottom()
+	assert(g_picker)
+	g_picker.state.s_offset = picker_screen_offset_min()
+	g_picker.state.c_offset = picker_cursor_offset_min()
+	picker_draw()
+end
+
 ---@class alex.ffind.OpenPickerConfig
 ---@field on_select fun(selected: alex.ffind.PickerEntry?, winmode: alex.ffind.WinMode): any
 ---@field sorter? alex.ffind.SortFn
 ---@field on_cancel? fun(selected: boolean)
 
----@param lines alex.ffind.PickerEntry[]
+---@param entries alex.ffind.PickerEntry[]
 ---@param config alex.ffind.OpenPickerConfig
-function M.open_picker(lines, config)
+function M.open_picker(entries, config)
 	local on_select = config.on_select
 	local sorter = config.sorter or M.default_sorter
 	local on_cancel = config.on_cancel
@@ -167,7 +285,7 @@ function M.open_picker(lines, config)
 		row = math.floor(vim.o.lines * 0.15),
 		col = math.floor(vim.o.columns * 0.15),
 	})
-	local inner_window = vim.api.nvim_open_win(inner_winbuf, true,  {
+	local inner_window = vim.api.nvim_open_win(inner_winbuf, true, {
 		relative = "win",
 		win = outer_window,
 		style = "minimal",
@@ -184,15 +302,14 @@ function M.open_picker(lines, config)
 		inner = { win = inner_window, buf = inner_winbuf },
 		outer = { win = outer_window, buf = outer_winbuf },
 		augroup = augroup,
-		entries = lines,
+		entries = entries,
 		on_select = on_select,
 		sorter = sorter,
 		on_cancel = on_cancel,
 		state = {
-			filtered = {},
-			shown = {},
-			c_offset = 0,
-			s_offset = 0,
+			filtered = entries,
+			c_offset = picker_cursor_offset_min(),
+			s_offset = picker_screen_offset_min(),
 		}
 	}
 	vim.wo[outer_window].cursorline = true
@@ -213,28 +330,21 @@ function M.open_picker(lines, config)
 		callback = reset_picker_window,
 	})
 	vim.keymap.set("n", "<Esc>", terminate_picker, { buffer = true })
-	-- vim.keymap.set({ "n", "i" }, "<Enter>", function()
-	-- 	local result = get_selected_field()
-	-- 	terminate_picker(true)
-	-- 	on_select(result, "none")
-	-- end, { buffer = true })
-	-- vim.keymap.set({ "n", "i" }, "<C-v>", function()
-	-- 	local result = get_selected_field()
-	-- 	terminate_picker(true)
-	-- 	on_select(result, "vert")
-	-- end, { buffer = true })
-	-- vim.keymap.set({ "n", "i" }, "<C-n>", function()
-	-- 	local result = get_selected_field()
-	-- 	terminate_picker(true)
-	-- 	on_select(result, "norm")
-	-- end, { buffer = true })
-	-- vim.keymap.set("n", "k", move_cursor_up, { buffer = true })
-	-- vim.keymap.set("n", "j", move_cursor_down, { buffer = true })
-	-- vim.keymap.set("i", "<C-k>", move_cursor_up, { buffer = true })
-	-- vim.keymap.set("i", "<C-j>", move_cursor_down, { buffer = true })
-	-- vim.keymap.set({"n", "i"}, "<C-y>", scroll_screen_up, { buffer = true })
-	-- vim.keymap.set({"n", "i"}, "<C-e>", scroll_screen_down, { buffer = true })
+	vim.keymap.set({ "n", "i" }, "<Enter>", run("none"), { buffer = true })
+	vim.keymap.set({ "n", "i" }, "<C-v>", run("vert"), { buffer = true })
+	vim.keymap.set({ "n", "i" }, "<C-n>", run("norm"), { buffer = true })
+	vim.keymap.set("n", "k", move_cursor_up, { buffer = true })
+	vim.keymap.set("n", "j", move_cursor_down, { buffer = true })
+	vim.keymap.set("i", "<C-k>", move_cursor_up, { buffer = true })
+	vim.keymap.set("i", "<C-j>", move_cursor_down, { buffer = true })
+	vim.keymap.set({"n", "i"}, "<C-y>", scroll_screen_up, { buffer = true })
+	vim.keymap.set({"n", "i"}, "<C-e>", scroll_screen_down, { buffer = true })
+	vim.keymap.set({"n", "i"}, "<C-u>", scroll_screen_up_u, { buffer = true })
+	vim.keymap.set({"n", "i"}, "<C-d>", scroll_screen_down_d, { buffer = true })
+	vim.keymap.set("n", "gg", move_screen_cursor_top, { buffer = true })
+	vim.keymap.set("n", "G", move_screen_cursor_bottom, { buffer = true })
 	vim.cmd.startinsert()
+	picker_draw()
 end
 
 ---@type alex.ffind.SortFn
@@ -247,12 +357,12 @@ end
 ---@param winmode alex.ffind.WinMode
 ---@param path string
 local function edit_file(winmode, path)
-		local table = {
-			none = "e ",
-			norm = "new ",
-			vert = "vnew ",
-		}
-		vim.cmd(table[winmode] .. vim.fn.fnameescape(path))
+	local table = {
+		none = "e ",
+		norm = "new ",
+		vert = "vnew ",
+	}
+	vim.cmd(table[winmode] .. vim.fn.fnameescape(path))
 end
 
 ---@class alex.ffind.FindFileConfig
@@ -334,7 +444,7 @@ function M.grep_files(config)
 		local file = entry.data.file
 		edit_file(winmode, file)
 		local row = entry.data.row
-		vim.api.nvim_win_set_cursor(0, {row, 0})
+		vim.api.nvim_win_set_cursor(0, { row, 0 })
 	end
 	M.open_picker({}, {
 		on_select = on_select,
