@@ -24,6 +24,11 @@ vim.o.showtabline = 0
 vim.o.shortmess = vim.o.shortmess .. "I"
 vim.api.nvim_create_autocmd('BufLeave', {
 	callback = function(ev)
+		if vim.bo[ev.buf].filetype == 'markdown' then
+			vim.o.spell = false
+			vim.o.wrap = false
+			vim.o.relativenumber = true
+		end
 		if vim.bo[ev.buf].buftype == 'quickfix' then
 			vim.api.nvim_buf_delete(ev.buf, {})
 		end
