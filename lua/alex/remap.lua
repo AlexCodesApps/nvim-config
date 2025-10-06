@@ -55,6 +55,7 @@ local ffind = require('alex.ffind')
 vim.keymap.set('n', '<leader>fr', function()
 	ffind.find_file {
 		cwd = os.getenv('HOME'),
+		gitignore = false,
 	}
 end)
 vim.keymap.set('n', '<leader>fg', function()
