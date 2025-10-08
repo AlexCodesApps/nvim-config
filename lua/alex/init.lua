@@ -1,6 +1,7 @@
 require('alex.lazy')
 require('alex.lsp')
 require('alex.floaterm').setup()
+local api = require('alex.api')
 vim.o.background = 'dark'
 vim.cmd.colorscheme('github_dark_default')
 vim.o.splitright = true
@@ -24,23 +25,18 @@ vim.o.showtabline = 0
 vim.o.shortmess = vim.o.shortmess .. "I"
 vim.api.nvim_create_autocmd('BufLeave', {
 	callback = function(ev)
-		if vim.bo[ev.buf].filetype == 'markdown' then
-			vim.o.spell = false
-			vim.o.wrap = false
-			vim.o.relativenumber = true
-		end
 		if vim.bo[ev.buf].buftype == 'quickfix' then
 			vim.api.nvim_buf_delete(ev.buf, {})
 		end
 	end
 })
 vim.api.nvim_create_autocmd('BufEnter', {
-	pattern = os.getenv("HOME") .. "/Documents/**/*.md",
+	pattern = api.home_dir() .. "/Documents/**/*.md",
 	callback = function(_)
 		if vim.bo.filetype == 'markdown' then
-			vim.o.spell = true
-			vim.o.wrap = true
-			vim.o.relativenumber = false
+			vim.opt_local.spell = true
+			vim.opt_local.wrap = true
+			vim.opt_local.relativenumber = false
 			vim.keymap.set("n", "j", "gj", { buffer = true })
 			vim.keymap.set("n", "k", "gk", { buffer = true })
 		end

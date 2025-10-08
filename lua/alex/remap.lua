@@ -1,4 +1,5 @@
 local config_path = vim.fn.stdpath('config')
+local api = require('alex.api')
 vim.g.mapleader = ' '
 vim.keymap.set('n', '<leader>ee', ':Ex<CR>')
 vim.keymap.set('n', '<leader>ec', ':Ex ' .. config_path .. '<CR>')
@@ -54,7 +55,7 @@ end)
 local ffind = require('alex.ffind')
 vim.keymap.set('n', '<leader>fr', function()
 	ffind.find_file {
-		cwd = os.getenv('HOME'),
+		cwd = api.home_dir(),
 		gitignore = false,
 	}
 end)
