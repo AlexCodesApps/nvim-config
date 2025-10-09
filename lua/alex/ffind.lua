@@ -264,6 +264,7 @@ local function move_screen_cursor_bottom()
 end
 
 ---@class alex.ffind.OpenPickerConfig
+---@field title? string
 ---@field on_select fun(selected: alex.ffind.PickerEntry?, winmode: alex.ffind.WinMode): any
 ---@field sorter? alex.ffind.SortFn
 ---@field on_cancel? fun(selected: boolean)
@@ -271,15 +272,18 @@ end
 ---@param entries alex.ffind.PickerEntry[]
 ---@param config alex.ffind.OpenPickerConfig
 function M.open_picker(entries, config)
+	local title = config.title or "Finder"
 	local on_select = config.on_select
 	local sorter = config.sorter or M.default_sorter
 	local on_cancel = config.on_cancel
 	local outer_winbuf = vim.api.nvim_create_buf(false, true)
 	local inner_winbuf = vim.api.nvim_create_buf(false, true)
 	local outer_window = vim.api.nvim_open_win(outer_winbuf, false, {
+		title = title,
+		title_pos = "center",
 		relative = "editor",
 		style = "minimal",
-		border = "none",
+		border = "rounded",
 		width = math.floor(vim.o.columns * 0.7),
 		height = math.floor(vim.o.lines * 0.7),
 		row = math.floor(vim.o.lines * 0.15),
@@ -289,11 +293,11 @@ function M.open_picker(entries, config)
 		relative = "win",
 		win = outer_window,
 		style = "minimal",
-		border = "none",
+		border = "rounded",
 		width = vim.api.nvim_win_get_width(outer_window),
 		height = 1,
-		row = vim.api.nvim_win_get_height(outer_window),
-		col = 0,
+		row = vim.api.nvim_win_get_height(outer_window) + 1,
+		col = -1,
 	})
 	local augroup = vim.api.nvim_create_augroup("alex.ffind", {
 		clear = true
@@ -313,8 +317,6 @@ function M.open_picker(entries, config)
 		}
 	}
 	vim.wo[outer_window].cursorline = true
-	vim.wo.winhl = "Normal:Alex.FFind"
-	vim.api.nvim_set_hl(0, "Alex.FFind", { bg = "#202040" })
 	vim.api.nvim_create_autocmd("BufLeave", {
 		group = augroup,
 		buffer = inner_winbuf,
@@ -386,6 +388,7 @@ function M.find_file(config)
 	fetch_recursive_files(path, "", exclude_pattern, gitignore, function(files)
 		local entries = M.picker_entry.from_list(files)
 		M.open_picker(entries, {
+			title = "Find File",
 			on_select = on_select
 		})
 	end)
@@ -447,6 +450,7 @@ function M.grep_files(config)
 		vim.api.nvim_win_set_cursor(0, { row, 0 })
 	end
 	M.open_picker({}, {
+		title = "Live Grep",
 		on_select = on_select,
 		sorter = sorter,
 		on_cancel = on_cancel,
@@ -477,6 +481,7 @@ function M.find_buffer()
 		vim.cmd.buffer(tostring(buffer))
 	end
 	M.open_picker(entries, {
+		title = "Find Buffer",
 		on_select = on_select
 	})
 end
@@ -509,6 +514,7 @@ function M.find_help()
 		vim.cmd(table[winmode] .. "help " .. help)
 	end
 	M.open_picker(cached_help_entries, {
+		title = "Browse Help",
 		on_select = on_select,
 	})
 end
@@ -559,6 +565,7 @@ local function open_picker_qf_symbol_list(list)
 		vim.api.nvim_win_set_cursor(0, { item.lnum, item.col - 1 })
 	end
 	M.open_picker(entries, {
+		title = "LSP Symbols",
 		on_select = on_select
 	})
 end
@@ -628,6 +635,7 @@ function M.find_manpage()
 	end
 	fetch_manpage_entries(function(entries)
 		M.open_picker(entries, {
+			title = "Browse Manpages",
 			on_select = on_select
 		})
 	end)
@@ -650,6 +658,7 @@ function M.find_colorscheme()
 		vim.cmd.colorscheme(selected.text)
 	end
 	M.open_picker(cached_colorschemes, {
+		title = "Choose Colorscheme",
 		on_select = on_select
 	})
 end
