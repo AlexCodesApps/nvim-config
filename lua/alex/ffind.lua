@@ -168,10 +168,9 @@ local function move_cursor_up()
 			return
 		end
 		g_picker.state.s_offset = g_picker.state.s_offset + 1
-		picker_draw()
-		return
+	else
+		g_picker.state.c_offset = g_picker.state.c_offset + 1
 	end
-	g_picker.state.c_offset = g_picker.state.c_offset + 1
 	picker_draw()
 end
 
