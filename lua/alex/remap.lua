@@ -16,28 +16,22 @@ vim.keymap.set({'n', 'x'}, '<leader>P', '"+P')
 vim.keymap.set({'n', 't'}, '<C-x>z', require('alex.floaterm').toggle)
 vim.keymap.set({'n', 't'}, '<C-x><C-z>', require('alex.floaterm').toggle)
 vim.keymap.set({'n', 'x'}, '<S-Tab>', function()
-	if vim.w.alex_focus then
-		local state = vim.w.alex_focus
+	if vim.w.focused_window then
+		local winid = vim.w.focused_window
 		local pos = vim.api.nvim_win_get_cursor(0)
 		local bufid = vim.api.nvim_get_current_buf()
 		vim.cmd.tabclose()
-		vim.api.nvim_set_current_tabpage(state.tabid)
-		vim.api.nvim_set_current_win(state.winid)
+		vim.api.nvim_set_current_win(winid)
 		vim.api.nvim_set_current_buf(bufid)
 		vim.api.nvim_win_set_cursor(0, pos)
 		return
 	end
-	local bufid = vim.api.nvim_get_current_buf()
 	local winid = vim.api.nvim_get_current_win()
-	local tabid = vim.api.nvim_get_current_tabpage()
-	local pos = vim.api.nvim_win_get_cursor(0)
-	vim.cmd.tabnew()
-	vim.api.nvim_set_current_buf(bufid)
-	vim.api.nvim_win_set_cursor(0, pos)
-	vim.w.alex_focus = {
-		winid = winid,
-		tabid = tabid,
-	}
+	local st = vim.wo.statusline
+	if st == "" then st = "%F" end
+	vim.cmd("tab split")
+	vim.wo.statusline = st .. " (ZOOMED)"
+	vim.w.focused_window = winid
 end)
 
 vim.keymap.set('n', '<leader>ff', function()
