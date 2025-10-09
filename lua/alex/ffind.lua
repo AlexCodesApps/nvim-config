@@ -276,6 +276,7 @@ function M.open_picker(entries, config)
 	local on_select = config.on_select
 	local sorter = config.sorter or M.default_sorter
 	local on_cancel = config.on_cancel
+	terminate_picker(false)
 	local outer_winbuf = vim.api.nvim_create_buf(false, true)
 	local inner_winbuf = vim.api.nvim_create_buf(false, true)
 	local outer_window = vim.api.nvim_open_win(outer_winbuf, false, {
@@ -289,6 +290,7 @@ function M.open_picker(entries, config)
 		row = math.floor(vim.o.lines * 0.15),
 		col = math.floor(vim.o.columns * 0.15),
 	})
+	vim.wo[outer_window].winhl = 'Normal:Normal,FloatBorder:Normal'
 	local inner_window = vim.api.nvim_open_win(inner_winbuf, true, {
 		relative = "win",
 		win = outer_window,
@@ -299,6 +301,7 @@ function M.open_picker(entries, config)
 		row = vim.api.nvim_win_get_height(outer_window) + 1,
 		col = -1,
 	})
+	vim.wo[inner_window].winhl = 'Normal:Normal,FloatBorder:Normal'
 	local augroup = vim.api.nvim_create_augroup("alex.ffind", {
 		clear = true
 	})
