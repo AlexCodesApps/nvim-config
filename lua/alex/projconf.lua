@@ -25,13 +25,17 @@ local function get_config_path(cwd)
 	return state_dir .. "/" .. name .. ".lua"
 end
 
+local loaded_configs = {}
+
 local function load_config()
+	loaded_configs = {}
 	local jobs = {}
 	vim.fn.mkdir(state_dir, "p")
 	local cwd = vim.fn.getcwd()
 	while true do
 		local path = get_config_path(cwd)
 		if fs_stat(path) then
+			table.insert(loaded_configs, cwd)
 			table.insert(jobs, vim.fn.fnameescape(path))
 		end
 		local nextcwd = cwd:match("^(.*)/")
@@ -72,11 +76,18 @@ local function cleanup()
 	end
 end
 
+local function print_loaded()
+	for _, path in ipairs(loaded_configs) do
+		print(path)
+	end
+end
+
 M.load_config = load_config
 M.edit_config = edit_config
 M.delete_config = delete_config
 M.path_to_hash = path_to_hash
 M.hash_to_path = hash_to_path
+M.print_loaded = print_loaded
 M.cleanup = cleanup
 
 function M.setup()
@@ -86,7 +97,8 @@ function M.setup()
 			edit = edit_config,
 			load = load_config,
 			delete = delete_config,
-			cleanup = cleanup
+			cleanup = cleanup,
+			loaded = print_loaded,
 		}
 		local action = actions[cmd]
 		if action then
@@ -98,7 +110,7 @@ function M.setup()
 		nargs = 1,
 		complete = function(arg, _, _)
 			local pattern = "^" .. arg
-			local entries = { "edit", "load", "delete", "cleanup" }
+			local entries = { "edit", "load", "delete", "cleanup", "loaded" }
 			return vim.tbl_filter(function(entry)
 				return entry:match(pattern)
 			end, entries)
