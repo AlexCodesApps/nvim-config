@@ -4,7 +4,7 @@ local state = {}
 
 function M.home_dir()
 	if not state.home then
-		state.home = os.getenv("HOME")
+		state.home = (vim.uv or vim.loop).os_homedir()
 	end
 	return state.home
 end
