@@ -54,6 +54,11 @@ local function edit_config()
 	vim.cmd.edit(vim.fn.fnameescape(path))
 end
 
+local function view_config()
+	local path = get_config_path()
+	vim.cmd.view(vim.fn.fnameescape(path))
+end
+
 local function delete_config()
 	local path = get_config_path()
 	vim.fs.rm(path, {
@@ -84,6 +89,7 @@ end
 
 M.load_config = load_config
 M.edit_config = edit_config
+M.view_config = view_config
 M.delete_config = delete_config
 M.path_to_hash = path_to_hash
 M.hash_to_path = hash_to_path
@@ -96,6 +102,7 @@ function M.setup()
 		local actions = {
 			edit = edit_config,
 			load = load_config,
+			view = view_config,
 			delete = delete_config,
 			cleanup = cleanup,
 			loaded = print_loaded,
@@ -110,7 +117,7 @@ function M.setup()
 		nargs = 1,
 		complete = function(arg, _, _)
 			local pattern = "^" .. arg
-			local entries = { "edit", "load", "delete", "cleanup", "loaded" }
+			local entries = { "edit", "view", "load", "delete", "cleanup", "loaded" }
 			return vim.tbl_filter(function(entry)
 				return entry:match(pattern)
 			end, entries)
