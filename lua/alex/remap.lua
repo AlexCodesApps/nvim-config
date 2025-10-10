@@ -33,20 +33,19 @@ vim.keymap.set({'n', 'x'}, '<S-Tab>', function()
 	vim.wo.statusline = st .. " (ZOOMED)"
 	vim.w.focused_window = winid
 end)
-
+local ffind = require('alex.ffind')
 vim.keymap.set('n', '<leader>ff', function()
-	require('alex.ffind').find_file {
+	ffind.find_file {
 		exclude_pattern = vim.g.ffind_exclude_pattern,
 		gitignore = vim.g.ffind_gitignore == 1,
 	}
 end)
 vim.keymap.set('n', '<leader>fc', function()
-	require('alex.ffind').find_file {
+	ffind.find_file {
 		cwd = vim.fn.stdpath('config'),
 		gitignore = true,
 	}
 end)
-local ffind = require('alex.ffind')
 vim.keymap.set('n', '<leader>fr', function()
 	ffind.find_file {
 		cwd = api.home_dir(),
