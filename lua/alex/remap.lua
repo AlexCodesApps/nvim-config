@@ -79,7 +79,7 @@ end)
 vim.keymap.set('n', '<leader>da', vim.diagnostic.setqflist)
 vim.api.nvim_create_user_command("CSwitch", function()
 	local path = vim.api.nvim_buf_get_name(0)
-	local filename, extension = path:match([[/([^/]+)%.(%a+)$]])
+	local filename, extension = path:gsub("\\", "/"):match([[/([^/]+)%.(%a+)$]])
 	if not filename then return end
 	local ext_table = {
 		["c"] = "h",

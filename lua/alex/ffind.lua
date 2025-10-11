@@ -649,7 +649,7 @@ function M.find_colorscheme()
 		cached_colorschemes = {}
 		local rtp = vim.o.runtimepath
 		for _, path in ipairs(vim.fn.globpath(rtp, "**/colors/*", false, true)) do
-			local name, ext = path:match("([^%./]+)%.([^%./]+)$")
+			local name, ext = path:gsub("\\", "/"):match("([^%./]+)%.([^%./]+)$")
 			if ext == "vim" or ext == "lua" and name then
 				table.insert(cached_colorschemes, M.picker_entry.new(name, nil))
 			end
