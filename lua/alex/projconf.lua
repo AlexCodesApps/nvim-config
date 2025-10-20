@@ -61,9 +61,14 @@ end
 
 local function delete_config()
 	local path = get_config_path()
-	vim.fs.rm(path, {
-		force = true
-	})
+	local function on_input(input)
+		if input ~= "y" then return end
+		vim.fs.rm(path, { force = true })
+		vim.notify(("Deleted '%s'"):format(path))
+	end
+	vim.ui.input({
+		prompt = ("confirm deletion of '%s'? [y/n]: "):format(path)
+	}, on_input)
 end
 
 local function cleanup()
