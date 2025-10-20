@@ -184,3 +184,12 @@ vim.api.nvim_create_user_command("Pad", function(tbl)
 	cmd.range = { tbl.line1, tbl.line2 }
 	vim.cmd(cmd)
 end, { desc = "Align input lines", nargs = 1, range = true })
+vim.api.nvim_create_user_command("Focus", function()
+	local function on_unfocused()
+		vim.notify("FOCUS")
+	end
+	vim.keymap.set("n", "<leader>fc", on_unfocused);
+	vim.keymap.set("n", "<leader>fr", on_unfocused);
+	vim.keymap.set("n", "<leader>fh", on_unfocused);
+	vim.keymap.set("n", "<leader>ft", on_unfocused);
+end, { desc = "Focus." })
