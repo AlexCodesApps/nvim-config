@@ -87,8 +87,10 @@ local function cleanup()
 end
 
 local function print_loaded()
+	print("Loaded ProjConf Configs")
+	print("=======================")
 	for _, path in ipairs(loaded_configs) do
-		print(path)
+		print(("'%s' ('%s')"):format(path, get_config_path(path)))
 	end
 end
 
