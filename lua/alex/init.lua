@@ -1,9 +1,20 @@
+require('alex.remap')
 require('alex.lazy')
 require('alex.lsp')
 require('alex.floaterm').setup()
 local api = require('alex.api')
 vim.o.background = 'dark'
 vim.cmd.colorscheme('github_dark_default')
+vim.g.loaded_perl_provider = 0
+vim.g.loaded_node_provider = 0
+vim.g.loaded_ruby_provider = 0
+if vim.g.neovide then
+	vim.g.neovide_cursor_animation_length = 0
+	vim.g.neovide_scroll_animation_length = 0
+	vim.g.neovide_scale_factor = 0.66
+	vim.g.neovide_position_animation_length = 0
+	vim.g.neovide_cursor_animate_command_line = false
+end
 vim.o.splitright = true
 vim.o.tabstop = 4
 vim.o.shiftwidth = 4
