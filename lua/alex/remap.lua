@@ -33,6 +33,17 @@ vim.keymap.set({'n', 'x'}, '<S-Tab>', function()
 	vim.wo.statusline = st .. " (ZOOMED)"
 	vim.w.focused_window = winid
 end)
+vim.keymap.set({'n'}, '<leader>t', function()
+	local function on_input(input)
+		if not input or input == '' then return end
+		local output = ('<%s></%s>'):format(input, input)
+		vim.api.nvim_paste(output, false, -1)
+		vim.cmd('norm ' .. tostring(#input + 3) .. 'h')
+	end
+	vim.ui.input({
+		prompt = 'Enter the HTML tag: ',
+	}, on_input)
+end)
 local ffind = require('alex.ffind')
 vim.keymap.set('n', '<leader>ff', function()
 	ffind.find_file {
