@@ -606,7 +606,7 @@ function M.find_manpage()
 			listeners = { callback },
 			result = nil,
 		}
-		vim.system({ "apropos", ".*" }, { text = true }, function(obj)
+		vim.system({ "apropos", "." }, { text = true }, function(obj)
 			if obj.stdout == nil then
 				error("couldn't grab manpages")
 			end
