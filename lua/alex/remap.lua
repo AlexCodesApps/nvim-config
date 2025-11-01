@@ -28,11 +28,16 @@ vim.keymap.set({'n', 'x'}, '<S-Tab>', function()
 	end
 	local winid = vim.api.nvim_get_current_win()
 	local st = vim.wo.statusline
-	if st == "" then st = "%F" end
-	vim.cmd("tab split")
-	vim.wo.statusline = st .. " (ZOOMED)"
+	if st == '' then st = '%F' end
+	vim.cmd('tab split')
+	vim.wo.statusline = st .. ' (ZOOMED)'
 	vim.w.focused_window = winid
 end)
+
+for i=0,9 do
+	vim.keymap.set('n', ('<M-%d>'):format(i), ('%dgt'):format(i))
+end
+
 vim.keymap.set({'n'}, '<leader>t', function()
 	local function on_input(input)
 		if not input or input == '' then return end
@@ -44,6 +49,19 @@ vim.keymap.set({'n'}, '<leader>t', function()
 		prompt = 'Enter the HTML tag: ',
 	}, on_input)
 end)
+
+vim.keymap.set('i', '<C-t>', function()
+	local function on_input(input)
+		if not input or input == '' then return end
+		local output = ('<%s></%s>'):format(input, input)
+		vim.api.nvim_paste(output, false, -1)
+		vim.cmd('norm ' .. tostring(#input + 3) .. 'h')
+	end
+	vim.ui.input({
+		prompt = 'Enter the HTML tag: ',
+	}, on_input)
+end)
+
 local ffind = require('alex.ffind')
 vim.keymap.set('n', '<leader>ff', function()
 	ffind.find_file {
@@ -78,47 +96,60 @@ vim.keymap.set('n', '<leader>ft', ffind.find_colorscheme)
 
 vim.keymap.set('n', '<leader>de', function()
 	vim.diagnostic.setqflist {
-		severity = "ERROR",
+		severity = 'ERROR',
 	}
 end)
 vim.keymap.set('n', '<leader>dw', function()
 	vim.diagnostic.setqflist {
-		severity = "WARN",
+		severity = 'WARN',
 	}
 end)
 vim.keymap.set('n', '<leader>da', vim.diagnostic.setqflist)
-vim.api.nvim_create_user_command("CSwitch", function()
+vim.api.nvim_create_user_command('CSwitch', function()
 	local path = vim.api.nvim_buf_get_name(0)
-	local filename, extension = path:gsub("\\", "/"):match([[/([^/]+)%.(%a+)$]])
-	if not filename then return end
+	local filename, extension = path:gsub('\\', '/'):match([[/([^/]+)%.(%a+)$]])
+	if not filename then
+		vim.notify('no extension found')
+		return
+	end
 	local ext_table = {
-		["c"] = "h",
-		["h"] = "c",
-		["cpp"] = "hpp",
-		["hpp"] = "cpp",
+		['c'] = 'h',
+		['h'] = 'c',
+		['cpp'] = 'hpp',
+		['hpp'] = 'cpp',
 	}
 	local extension2 = ext_table[extension]
-	if extension2 == nil then return end
-	local files = vim.fn.findfile(filename .. "." .. extension2, "**/*", -1)
-	if #files ~= 1 then return end
-	vim.cmd("e " .. vim.fn.fnameescape(files[1]))
+	if extension2 == nil then
+		vim.notify('unknown extension [.' .. extension .. ']')
+		return
+	end
+	local files = vim.fn.findfile(filename .. '.' .. extension2, '**', -1)
+	if #files == 0 then
+		vim.notify('no candidates found')
+		return
+	end
+	if #files ~= 1 then
+		vim.notify('multiple candidates found')
+		return
+	end
+	vim.cmd('e ' .. vim.fn.fnameescape(files[1]))
 end, {})
 
-vim.api.nvim_create_user_command("MkMdTable", function(opts)
+vim.api.nvim_create_user_command('MkMdTable', function(opts)
 	local input = vim.api.nvim_buf_get_lines(0, opts.line1 - 1, opts.line2, true)
 	if #input < 2 then return end
 	local header = input[1]
 	table.remove(input, 1)
-	local header_list = vim.split(header, "|")
+	local header_list = vim.split(header, '|')
 	local width = #header_list
 	if width < 1 then return end
 	local tbl = {}
 	local padtbl = vim.tbl_map(string.len, header_list)
 	for i=1, #input do
 		local line = input[i]
-		local items = vim.split(line, "|")
+		local items = vim.split(line, '|')
 		if #items ~= width then
-			vim.notify("Width of table is not regular!")
+			vim.notify('Width of table is not regular!')
 			return
 		end
 		for j=1,width do
@@ -128,68 +159,68 @@ vim.api.nvim_create_user_command("MkMdTable", function(opts)
 		tbl[i] = items
 	end
 	local function print_row(row)
-		local o = ""
+		local o = ''
 		for i=1, #row do
 			local str = row[i]
 			local mwidth = padtbl[i]
 			local pad = mwidth - str:len() + 1
 			for _=1,pad do
-				str = str .. " "
+				str = str .. ' '
 			end
-			o = o .. "| " .. str
+			o = o .. '| ' .. str
 		end
-		o = o .. "|"
+		o = o .. '|'
 		return o
 	end
 	local output = {
 		print_row(header_list)
 	}
-	local sep = "|"
+	local sep = '|'
 	for _, itemw in ipairs(padtbl) do
-		sep = sep .. "-"
+		sep = sep .. '-'
 		for _=1,itemw do
-			sep = sep .. "-"
+			sep = sep .. '-'
 		end
-		sep = sep .. "-|"
+		sep = sep .. '-|'
 	end
 	table.insert(output, sep)
 	for _, row in ipairs(tbl) do
 		table.insert(output, print_row(row))
 	end
 	vim.api.nvim_buf_set_lines(0, opts.line1 - 1, opts.line2, true, output)
-end, { desc = "Make markdown table", range = true })
+end, { desc = 'Make markdown table', range = true })
 
-vim.api.nvim_create_user_command("UnMkMdTable", function(opts)
+vim.api.nvim_create_user_command('UnMkMdTable', function(opts)
 	local input = vim.api.nvim_buf_get_lines(0, opts.line1 - 1, opts.line2, true)
 	if #input < 3 then return end
 	table.remove(input, 2)
 	local output = {}
 	for _, line in ipairs(input) do
 		local output_line = line
-			:gsub("%s*|%s*", "|")
-			:match("^|(.*)|$")
+			:gsub('%s*|%s*', '|')
+			:match('^|(.*)|$')
 		if not output_line then
-			vim.notify("Invalid syntax")
+			vim.notify('Invalid syntax')
 			return
 		end
 		table.insert(output, output_line)
 	end
 	vim.api.nvim_buf_set_lines(0, opts.line1 - 1, opts.line2, true, output)
-end, { desc = "Unmake markdown table", range = true })
+end, { desc = 'Unmake markdown table', range = true })
 
-vim.api.nvim_create_user_command("Pad", function(tbl)
+vim.api.nvim_create_user_command('Pad', function(tbl)
 	local count = tonumber(tbl.args)
 	local fmt = [[s/.*/\=printf('%-]] .. count .. [[s', submatch(0))]]
 	local cmd = vim.api.nvim_parse_cmd(fmt, {})
 	cmd.range = { tbl.line1, tbl.line2 }
 	vim.cmd(cmd)
-end, { desc = "Align input lines", nargs = 1, range = true })
-vim.api.nvim_create_user_command("Focus", function()
+end, { desc = 'Align input lines', nargs = 1, range = true })
+vim.api.nvim_create_user_command('Focus', function()
 	local function on_unfocused()
-		vim.notify("FOCUS")
+		vim.notify('FOCUS')
 	end
-	vim.keymap.set("n", "<leader>fc", on_unfocused);
-	vim.keymap.set("n", "<leader>fr", on_unfocused);
-	vim.keymap.set("n", "<leader>fh", on_unfocused);
-	vim.keymap.set("n", "<leader>ft", on_unfocused);
-end, { desc = "Focus." })
+	vim.keymap.set('n', '<leader>fc', on_unfocused);
+	vim.keymap.set('n', '<leader>fr', on_unfocused);
+	vim.keymap.set('n', '<leader>fh', on_unfocused);
+	vim.keymap.set('n', '<leader>ft', on_unfocused);
+end, { desc = 'Focus.' })

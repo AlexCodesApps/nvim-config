@@ -15,13 +15,14 @@ if vim.g.neovide then
 	vim.g.neovide_position_animation_length = 0
 	vim.g.neovide_cursor_animate_command_line = false
 end
+
 vim.o.splitright = true
 vim.o.tabstop = 4
 vim.o.shiftwidth = 4
 vim.o.number = true
 vim.o.relativenumber = true
 vim.o.list = true
-vim.o.mouse = ""
+vim.o.mouse = ''
 vim.o.wrap = false
 vim.o.linebreak = true
 vim.o.scrolloff = 4
@@ -30,10 +31,10 @@ vim.g.c_no_curly_error = 1
 vim.g.signcolumn = 'yes:1'
 vim.g.netrw_banner = 0
 vim.g.ffind_gitignore = 1
-vim.o.completeopt = "menuone,noinsert,fuzzy"
-vim.o.indentexpr = "nvim_treesitter#indent()"
+vim.o.completeopt = 'menuone,noinsert,fuzzy'
+vim.o.indentexpr = 'nvim_treesitter#indent()'
 vim.o.showtabline = 0
-vim.o.shortmess = vim.o.shortmess .. "I"
+vim.o.shortmess = vim.o.shortmess .. 'I'
 vim.api.nvim_create_autocmd('BufLeave', {
 	callback = function(ev)
 		if vim.bo[ev.buf].buftype == 'quickfix' then
@@ -76,4 +77,4 @@ if 1 == vim.fn.executable 'hyprctl' then
 	end
 end
 
-require("alex.projconf").setup()
+require('alex.projconf').setup()

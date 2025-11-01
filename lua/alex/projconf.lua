@@ -6,23 +6,23 @@ local fs_stat = (vim.uv or vim.loop).fs_stat
 ---@param path string
 ---@return string
 local function path_to_hash(path)
-	local s, _ = path:gsub("#", "#h"):gsub("/", "#a"):gsub("\\", "#b")
+	local s, _ = path:gsub('#', '#h'):gsub('/', '#a'):gsub('\\', '#b')
 	return s
 end
 
 ---@param hash string
 ---@return string
 local function hash_to_path(hash)
-	local s, _ = hash:gsub("#a", "/"):gsub("#b", "\\"):gsub("#h", "#")
+	local s, _ = hash:gsub('#a', '/'):gsub('#b', '\\'):gsub('#h', '#')
 	return s
 end
 
-local state_dir = vim.fn.stdpath("state") .. "/projconf"
+local state_dir = vim.fn.stdpath('state') .. '/projconf'
 
 local function get_config_path(cwd)
 	cwd = cwd or vim.fn.getcwd()
 	local name = path_to_hash(cwd)
-	return state_dir .. "/" .. name .. ".lua"
+	return state_dir .. '/' .. name .. '.lua'
 end
 
 local loaded_configs = {}
@@ -30,7 +30,7 @@ local loaded_configs = {}
 local function load_config()
 	loaded_configs = {}
 	local jobs = {}
-	vim.fn.mkdir(state_dir, "p")
+	vim.fn.mkdir(state_dir, 'p')
 	local cwd = vim.fn.getcwd()
 	while true do
 		local path = get_config_path(cwd)
@@ -38,7 +38,7 @@ local function load_config()
 			table.insert(loaded_configs, cwd)
 			table.insert(jobs, vim.fn.fnameescape(path))
 		end
-		local nextcwd = cwd:match("^(.*)/")
+		local nextcwd = cwd:match('^(.*)/')
 		if not nextcwd then
 			break
 		end
@@ -62,7 +62,7 @@ end
 local function delete_config()
 	local path = get_config_path()
 	local function on_input(input)
-		if input ~= "y" then return end
+		if input ~= 'y' then return end
 		vim.fs.rm(path, { force = true })
 		vim.notify(("Deleted '%s'"):format(path))
 	end
@@ -74,12 +74,12 @@ end
 local function cleanup()
 -- remove obselete configs
 	for file, type in vim.fs.dir(state_dir) do
-		if type == "file" then
-			local name = file:match("^(.*)%.lua$")
+		if type == 'file' then
+			local name = file:match('^(.*)%.lua$')
 			if name then
 				local path = hash_to_path(name)
 				if not fs_stat(path) then
-					vim.fs.rm(state_dir .. "/" .. file)
+					vim.fs.rm(state_dir .. '/' .. file)
 				end
 			end
 		end
@@ -87,8 +87,8 @@ local function cleanup()
 end
 
 local function print_loaded()
-	print("Loaded ProjConf Configs")
-	print("=======================")
+	print('Loaded ProjConf Configs')
+	print('=======================')
 	for _, path in ipairs(loaded_configs) do
 		print(("'%s' ('%s')"):format(path, get_config_path(path)))
 	end
@@ -123,14 +123,14 @@ function M.setup()
 	end, {
 		nargs = 1,
 		complete = function(arg, _, _)
-			local pattern = "^" .. arg
-			local entries = { "edit", "view", "load", "delete", "cleanup", "loaded" }
+			local pattern = '^' .. arg
+			local entries = { 'edit', 'view', 'load', 'delete', 'cleanup', 'loaded' }
 			return vim.tbl_filter(function(entry)
 				return entry:match(pattern)
 			end, entries)
 		end,
 	})
-	if not os.getenv("PROJCONF_SUPPRESS") then
+	if not os.getenv('PROJCONF_SUPPRESS') then
 		load_config()
 	end
 end
