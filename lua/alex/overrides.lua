@@ -27,10 +27,15 @@ end
 ---@field cancelreturn? string
 ---@field highlight? function
 
+local terminate = nil
+
 ---@param opts alex.Overrides.InputOpts
----@on_confirm function
+---@param on_confirm function
 ---@diagnostic disable-next-line: duplicate-set-field
 vim.ui.input = function(opts, on_confirm)
+	if terminate then
+		terminate()
+	end
 	local borders = {
 		"┌",
 		"─",
@@ -61,10 +66,11 @@ vim.ui.input = function(opts, on_confirm)
 	local augroup = vim.api.nvim_create_augroup('AlexOverrideInput', {
 		clear = true,
 	})
-	local function terminate()
+	terminate = function()
 		vim.api.nvim_del_augroup_by_id(augroup)
 		vim.api.nvim_buf_delete(buf, { force = true })
 		vim.cmd.stopinsert()
+		terminate = nil
 	end
 	local prompt_len = prompt:len()
 	local insert_keys = '<Esc>A'
