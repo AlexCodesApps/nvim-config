@@ -103,8 +103,8 @@ M.hash_to_path = hash_to_path
 M.print_loaded = print_loaded
 M.cleanup = cleanup
 
-function M.setup()
-	vim.api.nvim_create_user_command("ProjConf", function(opts)
+local function setup()
+	vim.api.nvim_create_user_command('ProjConf', function(opts)
 		local cmd = opts.fargs[1]
 		local actions = {
 			edit = edit_config,
@@ -134,5 +134,7 @@ function M.setup()
 		load_config()
 	end
 end
+
+setup()
 
 return M
