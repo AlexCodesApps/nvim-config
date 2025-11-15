@@ -21,7 +21,12 @@ function M.picker_entry.new(text, data)
 	return obj
 end
 
----@alias alex.ffind.WinMode "none"|"norm"|"vert"
+---@alias alex.ffind.WinMode "split"|"hsplit"|"vsplit"
+
+---@class alex.ffind.Actions
+---@field on_select fun(entry: alex.ffind.PickerEntry?, winmode: alex.ffind.WinMode)
+---@field to_qflist? fun(entries: alex.ffind.PickerEntry[])
+---@field to_loclist? fun(entries: alex.ffind.PickerEntry[])
 
 ---@param list string[]
 ---@return alex.ffind.PickerEntry[]
@@ -30,6 +35,10 @@ function M.picker_entry.from_list(list)
 		return M.picker_entry.new(text, nil)
 	end
 	return vim.tbl_map(helper, list)
+end
+
+local function qflist_next()
+	pcall(function() vim.cmd("cnext") end)
 end
 
 ---@param cwd string
@@ -65,7 +74,7 @@ end
 ---@field inner { win: integer, buf: integer }
 ---@field augroup integer
 ---@field entries alex.ffind.PickerEntry[]
----@field on_select fun(selected: alex.ffind.PickerEntry?, winmode: alex.ffind.WinMode): any
+---@field actions alex.ffind.Actions
 ---@field sorter alex.ffind.SortFn
 ---@field on_cancel? fun(selected: boolean)
 ---@field state { filtered: alex.ffind.PickerEntry[], c_offset: integer, s_offset: integer, sync_handle: any }
@@ -216,16 +225,6 @@ local function get_selected_field()
 	return g_picker.state.filtered[g_picker.state.s_offset + g_picker.state.c_offset + 1]
 end
 
-local function run(winmode)
-	return function()
-		assert(g_picker)
-		local selected = get_selected_field()
-		local on_select = g_picker.on_select
-		terminate_picker(true)
-		on_select(selected, winmode)
-	end
-end
-
 local function move_screen_cursor_top()
 	assert(g_picker)
 	g_picker.state.s_offset = picker_screen_offset_max()
@@ -264,7 +263,7 @@ end
 
 ---@class alex.ffind.OpenPickerConfig
 ---@field title? string
----@field on_select fun(selected: alex.ffind.PickerEntry?, winmode: alex.ffind.WinMode): any
+---@field actions alex.ffind.Actions
 ---@field sorter? alex.ffind.SortFn
 ---@field on_cancel? fun(selected: boolean)
 
@@ -272,7 +271,7 @@ end
 ---@param config alex.ffind.OpenPickerConfig
 function M.open_picker(entries, config)
 	local title = config.title or "Finder"
-	local on_select = config.on_select
+	local actions = config.actions
 	local sorter = config.sorter or M.default_sorter
 	local on_cancel = config.on_cancel
 	terminate_picker(false)
@@ -309,7 +308,7 @@ function M.open_picker(entries, config)
 		outer = { win = outer_window, buf = outer_winbuf },
 		augroup = augroup,
 		entries = entries,
-		on_select = on_select,
+		actions = actions,
 		sorter = sorter,
 		on_cancel = on_cancel,
 		state = {
@@ -333,10 +332,37 @@ function M.open_picker(entries, config)
 		buffer = inner_winbuf,
 		callback = reset_picker_window,
 	})
+	local function run_on_selected(winmode)
+		return function()
+			assert(g_picker)
+			local selected = get_selected_field()
+			local cb = g_picker.actions.on_select
+			terminate_picker(true)
+			cb(selected, winmode)
+		end
+	end
+	local function run_to_qflist()
+		assert(g_picker)
+		local cb = g_picker.actions.to_qflist
+		if not cb then return end
+		local filtered = g_picker.state.filtered
+		terminate_picker(true)
+		cb(filtered)
+	end
+	local function run_to_loclist()
+		assert(g_picker)
+		local cb = g_picker.actions.to_loclist
+		if not cb then return end
+		local filtered = g_picker.state.filtered
+		terminate_picker(true)
+		cb(filtered)
+	end
 	vim.keymap.set("n", "<Esc>", terminate_picker, { buffer = true })
-	vim.keymap.set({ "n", "i" }, "<Enter>", run("none"), { buffer = true })
-	vim.keymap.set({ "n", "i" }, "<C-v>", run("vert"), { buffer = true })
-	vim.keymap.set({ "n", "i" }, "<C-n>", run("norm"), { buffer = true })
+	vim.keymap.set({ "n", "i" }, "<Enter>", run_on_selected("split"), { buffer = true })
+	vim.keymap.set({ "n", "i" }, "<C-v>", run_on_selected("vsplit"), { buffer = true })
+	vim.keymap.set({ "n", "i" }, "<C-n>", run_on_selected("hsplit"), { buffer = true })
+	vim.keymap.set({ "n", "i" }, "<C-q>", run_to_qflist, { buffer = true })
+	vim.keymap.set({ "n", "i" }, "<C-l>", run_to_loclist, { buffer = true })
 	vim.keymap.set("n", "k", move_cursor_up, { buffer = true })
 	vim.keymap.set("n", "j", move_cursor_down, { buffer = true })
 	vim.keymap.set("i", "<C-k>", move_cursor_up, { buffer = true })
@@ -362,9 +388,9 @@ end
 ---@param path string
 local function edit_file(winmode, path)
 	local table = {
-		none = "e ",
-		norm = "new ",
-		vert = "vnew ",
+		split = "e ",
+		hsplit = "new ",
+		vsplit = "vnew ",
 	}
 	vim.cmd(table[winmode] .. vim.fn.fnameescape(path))
 end
@@ -387,11 +413,33 @@ function M.find_file(config)
 		local line = entry.text
 		edit_file(winmode, path .. "/" .. line)
 	end
+	---@param entries alex.ffind.PickerEntry[]
+	local function to_qflist(entries)
+		local qflist = vim.tbl_map(function(entry)
+			local line = entry.text
+			local fpath = path .. "/" .. line
+			return  {
+				filename = fpath,
+				lnum = 1,
+				col = 1,
+				text = line,
+			}
+		end, entries)
+		vim.fn.setqflist({}, "r", {
+			title = "Find File results",
+			items = qflist,
+		})
+		qflist_next()
+	end
+	local actions = { ---@type alex.ffind.Actions
+		on_select = on_select,
+		to_qflist = to_qflist,
+	}
 	fetch_recursive_files(path, "", exclude_pattern, gitignore, function(files)
 		local entries = M.picker_entry.from_list(files)
 		M.open_picker(entries, {
 			title = "Find File",
-			on_select = on_select
+			actions = actions,
 		})
 	end)
 end
@@ -451,11 +499,33 @@ function M.grep_files(config)
 		local row = entry.data.row
 		vim.api.nvim_win_set_cursor(0, { row, 0 })
 	end
+	---@param entries alex.ffind.PickerEntry[]
+	local function to_qflist(entries)
+		local qflist = vim.tbl_map(function(entry)
+			local file = entry.data.file
+			local row = entry.data.row
+			return {
+				filename = file,
+				lnum = row,
+				col = 1,
+				text = entry.text,
+			}
+		end, entries)
+		vim.fn.setqflist({}, "r", {
+			title = "Live Grep results",
+			items = qflist,
+		})
+		qflist_next()
+	end
+	local actions = { ---@type alex.ffind.Actions
+		on_select = on_select,
+		to_qflist = to_qflist,
+	}
 	M.open_picker({}, {
 		title = "Live Grep",
-		on_select = on_select,
 		sorter = sorter,
 		on_cancel = on_cancel,
+		actions = actions,
 	})
 end
 
@@ -473,18 +543,43 @@ function M.find_buffer()
 	local function on_select(entry, winmode)
 		if not entry then return nil end
 		local buffer = entry.data
-		if winmode ~= "none" then
+		if winmode ~= "split" then
 			local table = {
-				norm = "new",
-				vert = "vnew",
+				hsplit = "new",
+				vsplit = "vnew",
 			}
 			vim.cmd(table[winmode])
 		end
 		vim.cmd.buffer(tostring(buffer))
 	end
+	---@param entries_ alex.ffind.PickerEntry[]
+	local function to_qflist(entries_)
+		local qflist = vim.tbl_map(function(entry)
+			local bufnr = entry.data
+			local bufname = vim.api.nvim_buf_get_name(bufnr)
+			if bufname == "" then
+				bufname = tostring(bufnr)
+			end
+			local pos = vim.api.nvim_buf_get_mark(bufnr, '"')
+			return {
+				bufnr = bufnr,
+				text = bufname,
+				lnum = pos[1],
+				col = pos[2],
+			}
+		end, entries_)
+		vim.fn.setqflist({}, "r", {
+			title = "Find Buffer results",
+			items = qflist,
+		})
+		qflist_next()
+	end
 	M.open_picker(entries, {
 		title = "Find Buffer",
-		on_select = on_select
+		actions = {
+			on_select = on_select,
+			to_qflist = to_qflist,
+		}
 	})
 end
 
@@ -508,16 +603,18 @@ function M.find_help()
 	local function on_select(entry, winmode)
 		if not entry then return end
 		local table = {
-			none = "",
-			norm = "",
-			vert = "vert ",
+			split = "",
+			hsplit = "",
+			vsplit = "vert ",
 		}
 		local help = entry.text
 		vim.cmd(table[winmode] .. "help " .. help)
 	end
 	M.open_picker(cached_help_entries, {
 		title = "Browse Help",
-		on_select = on_select,
+		actions = {
+			on_select = on_select,
+		},
 	})
 end
 
@@ -558,17 +655,31 @@ local function open_picker_qf_symbol_list(list)
 		local item = entry.data ---@type alex.ffind.QfSymbolEntry
 		if item.filename ~= vim.api.nvim_buf_get_name(0) then
 			local table = {
-				none = "edit ",
-				norm = "new ",
-				vert = "vnew ",
+				split = "edit ",
+				hsplit = "new ",
+				vsplit = "vnew ",
 			}
 			vim.cmd(table[winmode] .. item.filename)
 		end
 		vim.api.nvim_win_set_cursor(0, { item.lnum, item.col - 1 })
 	end
+	---@param entries_ alex.ffind.PickerEntry[]
+	local function to_qflist(entries_)
+		local qflist = vim.tbl_map(function(entry)
+			return entry.data
+		end, entries_)
+		vim.fn.setqflist({}, "r", {
+			title = "LSP Symbol results",
+			items = qflist,
+		})
+		qflist_next()
+	end
 	M.open_picker(entries, {
 		title = "LSP Symbols",
-		on_select = on_select
+		actions = {
+			on_select = on_select,
+			to_qflist = to_qflist,
+		}
 	})
 end
 
@@ -626,10 +737,10 @@ function M.find_manpage()
 	end
 	local function on_select(selected, winmode)
 		if not selected then return end
-		if winmode ~= "none" then
+		if winmode ~= "split" then
 			local table = {
-				norm = "new",
-				vert = "vnew",
+				hsplit = "new",
+				vsplit = "vnew",
 			}
 			vim.cmd(table[winmode])
 		end
@@ -638,7 +749,9 @@ function M.find_manpage()
 	fetch_manpage_entries(function(entries)
 		M.open_picker(entries, {
 			title = "Browse Manpages",
-			on_select = on_select
+			actions = {
+				on_select = on_select,
+			}
 		})
 	end)
 end
@@ -661,7 +774,9 @@ function M.find_colorscheme()
 	end
 	M.open_picker(cached_colorschemes, {
 		title = "Choose Colorscheme",
-		on_select = on_select
+		actions = {
+			on_select = on_select
+		}
 	})
 end
 
