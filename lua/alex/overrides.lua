@@ -1,3 +1,5 @@
+local ffind = require('alex.ffind')
+
 if 1 == vim.fn.executable 'hyprctl' then
 	---@diagnostic disable-next-line: duplicate-set-field
 	vim.notify = function(msg, level, _)
@@ -48,8 +50,8 @@ vim.ui.input = function(opts, on_confirm)
 	}
 	local prompt = opts.prompt or ""
 	local default = opts.default or ""
-	local completion = opts.completion
-	local hightlight = opts.highlight
+	-- local completion = opts.completion -- TODO: should do something
+	-- local hightlight = opts.highlight
 	local buf = vim.api.nvim_create_buf(false, true)
 	local win = vim.api.nvim_open_win(buf, true, {
 		relative = 'laststatus',
@@ -104,4 +106,45 @@ vim.ui.input = function(opts, on_confirm)
 	end, { buffer = buf })
 	vim.keymap.set('n', '<Esc>', terminate, { buffer = buf })
 	vim.cmd('startinsert!')
+end
+
+---@class alex.Overrides.SelectOpts
+---@field prompt? string
+---@field format_item function
+---@field kind? string
+
+---@generic T
+---@param items T[]
+---@param opts alex.Overrides.SelectOpts
+---@param on_choice fun(item: T|nil, idx: integer|nil)
+---@diagnostic disable-next-line: duplicate-set-field
+vim.ui.select = function(items, opts, on_choice)
+	opts = opts or {}
+	local prompt = opts.prompt or "Select one of:"
+	local format_item = opts.format_item or tostring
+	local entries = vim.tbl_map(function(item)
+		return ffind.picker_entry.new(format_item(item), item)
+	end, items)
+	ffind.open_picker(entries, {
+		title = prompt,
+		actions = {
+			on_select = function(entry, _)
+				local idx = nil
+				if entry ~= nil then
+					for i, other in ipairs(entries) do
+						if other == entry then
+							idx = i
+							break
+						end
+					end
+				end
+				on_choice(entry and entry.data, idx)
+			end,
+			on_cancel = function(selected)
+				if not selected then
+					on_choice(nil, nil)
+				end
+			end
+		},
+	})
 end
