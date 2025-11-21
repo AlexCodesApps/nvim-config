@@ -25,6 +25,7 @@ end
 
 ---@class alex.ffind.Actions
 ---@field on_select fun(entry: alex.ffind.PickerEntry?, winmode: alex.ffind.WinMode)
+---@field on_cancel? fun(selected: boolean)
 ---@field to_qflist? fun(entries: alex.ffind.PickerEntry[])
 ---@field to_loclist? fun(entries: alex.ffind.PickerEntry[])
 
@@ -76,7 +77,6 @@ end
 ---@field entries alex.ffind.PickerEntry[]
 ---@field actions alex.ffind.Actions
 ---@field sorter alex.ffind.SortFn
----@field on_cancel? fun(selected: boolean)
 ---@field state { filtered: alex.ffind.PickerEntry[], c_offset: integer, s_offset: integer, sync_handle: any }
 
 ---@type alex.ffind.Picker?
@@ -93,7 +93,7 @@ local function terminate_picker(selected)
 		force = true
 	})
 	vim.cmd.stopinsert()
-	local on_cancel = g_picker.on_cancel
+	local on_cancel = g_picker.actions.on_cancel
 	g_picker = nil
 	if on_cancel then on_cancel(selected or false) end
 end
@@ -265,7 +265,6 @@ end
 ---@field title? string
 ---@field actions alex.ffind.Actions
 ---@field sorter? alex.ffind.SortFn
----@field on_cancel? fun(selected: boolean)
 
 ---@param entries alex.ffind.PickerEntry[]
 ---@param config alex.ffind.OpenPickerConfig
@@ -273,7 +272,6 @@ function M.open_picker(entries, config)
 	local title = config.title or "Finder"
 	local actions = config.actions
 	local sorter = config.sorter or M.default_sorter
-	local on_cancel = config.on_cancel
 	terminate_picker(false)
 	local outer_winbuf = vim.api.nvim_create_buf(false, true)
 	local inner_winbuf = vim.api.nvim_create_buf(false, true)
@@ -310,7 +308,6 @@ function M.open_picker(entries, config)
 		entries = entries,
 		actions = actions,
 		sorter = sorter,
-		on_cancel = on_cancel,
 		state = {
 			filtered = entries,
 			c_offset = picker_cursor_offset_min(),
@@ -519,12 +516,12 @@ function M.grep_files(config)
 	end
 	local actions = { ---@type alex.ffind.Actions
 		on_select = on_select,
+		on_cancel = on_cancel,
 		to_qflist = to_qflist,
 	}
 	M.open_picker({}, {
 		title = "Live Grep",
 		sorter = sorter,
-		on_cancel = on_cancel,
 		actions = actions,
 	})
 end
