@@ -1,7 +1,8 @@
 require('alex.remap')
 require('alex.lazy')
 require('alex.lsp')
-require('alex.floaterm').setup()
+require('alex.commands')
+require('alex.floaterm')
 require('alex.autocmd')
 require('alex.overrides')
 

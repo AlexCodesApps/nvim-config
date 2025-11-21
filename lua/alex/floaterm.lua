@@ -25,8 +25,6 @@ function M.toggle()
 	end
 end
 
-function M.setup()
-	vim.api.nvim_create_user_command('FloaTerm', M.toggle, {})
-end
+vim.api.nvim_create_user_command('FloaTerm', M.toggle, {})
 
 return M
