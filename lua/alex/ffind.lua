@@ -1,5 +1,7 @@
 local M = {}
 
+local INTERNAL_KEY = {} -- to use as a private field key value
+
 ---@class alex.ffind.PickerEntry
 ---@field text string
 ---@field data any
@@ -42,6 +44,56 @@ local function qflist_next()
 	pcall(function() vim.cmd("cnext") end)
 end
 
+---@class alex.ffind.Picker
+---@field outer { win: integer, buf: integer }
+---@field inner { win: integer, buf: integer }
+---@field augroup integer
+---@field entries alex.ffind.PickerEntry[]
+---@field actions alex.ffind.Actions
+---@field sorter alex.ffind.SortFn
+---@field state { filtered: alex.ffind.PickerEntry[], c_offset: integer, s_offset: integer, sync_handle: any }
+
+---@type alex.ffind.Picker?
+local g_picker = nil
+
+---@param input string
+---@param transform fun(line: string): alex.ffind.PickerEntry?
+---@param callback fun(entries: alex.ffind.PickerEntry[])
+---@param yield_count? integer
+local function nonblocking_process_stdout(input, transform, callback, yield_count)
+	local handle = assert(g_picker).state.sync_handle
+	yield_count = yield_count or 50
+	local function yield()
+		local co = coroutine.running()
+			vim.schedule(function()
+				if g_picker and g_picker.state.sync_handle == handle then
+					coroutine.resume(co)
+				end
+			end)
+		coroutine.yield()
+	end
+	local function run(cb)
+		coroutine.resume(coroutine.create(cb))
+	end
+	run(function()
+		local entries = {}
+		local i = 0
+		for line in vim.gsplit(input, "\n") do
+			local entry = transform(line)
+			if entry then
+				table.insert(entries, entry)
+			end
+			i = i + 1
+			if i >= yield_count then
+				i = 0
+				yield()
+			end
+		end
+		yield()
+		callback(entries)
+	end)
+end
+
 ---@param cwd string
 ---@param prefix? string
 ---@param exclude_pattern? string
@@ -69,18 +121,6 @@ local function fetch_recursive_files(cwd, prefix, exclude_pattern, gitignore, ca
 		vim.schedule(function() callback(files) end)
 	end)
 end
-
----@class alex.ffind.Picker
----@field outer { win: integer, buf: integer }
----@field inner { win: integer, buf: integer }
----@field augroup integer
----@field entries alex.ffind.PickerEntry[]
----@field actions alex.ffind.Actions
----@field sorter alex.ffind.SortFn
----@field state { filtered: alex.ffind.PickerEntry[], c_offset: integer, s_offset: integer, sync_handle: any }
-
----@type alex.ffind.Picker?
-local g_picker = nil
 
 ---@param selected? boolean
 local function terminate_picker(selected)
@@ -376,9 +416,52 @@ end
 
 ---@type alex.ffind.SortFn
 function M.default_sorter(entries, input, callback)
-	callback(vim.fn.matchfuzzy(entries, input, {
-		key = "text",
-	}))
+	local handle = assert(g_picker).state.sync_handle
+	local function yield()
+		local co = coroutine.running()
+		vim.schedule(function()
+			if g_picker and g_picker.state.sync_handle == handle then
+				coroutine.resume(co)
+			end
+		end)
+		coroutine.yield()
+	end
+	local function run(cb)
+		coroutine.resume(coroutine.create(cb))
+	end
+	local function sorted_insert(tbl, ent)
+		local score = ent[INTERNAL_KEY]
+		local low = 1
+		local high = #tbl + 1
+		while low < high do
+			local g = math.floor((low + high) / 2)
+			local score2 = tbl[g][INTERNAL_KEY]
+			if score2 >= score then
+				low = g + 1
+			else
+				high = g
+			end
+		end
+		table.insert(tbl, low, ent)
+	end
+	run(function()
+		local result = {}
+		local i = 0
+		for _, entry in ipairs(entries) do
+			entry[INTERNAL_KEY] = nil -- VimScript FFI doesn't allow this field
+			local lists = vim.fn.matchfuzzypos({ entry }, input, { key = "text" })
+			if #lists[1] ~= 0 then
+				entry[INTERNAL_KEY] = lists[3][1] -- The entries score is stored here
+				sorted_insert(result, entry)
+			end
+			i = i + 1
+			if i == 100 then
+				i = 0
+				yield()
+			end
+		end
+		callback(result)
+	end)
 end
 
 ---@param winmode alex.ffind.WinMode
@@ -468,18 +551,14 @@ function M.grep_files(config)
 			cmd = { "rg", "-n", "--no-heading", "--no-ignore", input }
 		end
 		running_future = vim.system(cmd, { cwd = cwd, text = true }, function(result)
-			if result.code ~= 0 then return end
-			local lines_iter = vim.gsplit(result.stdout, "\n")
-			local entries = {}
-			for line in lines_iter do
+			running_future = nil
+			if not g_picker then return end
+			local transform = function(line)
 				local file, row = string.match(line, "^([^:]+):(%d+):")
-				if file then
-					local entry = M.picker_entry.new(line, { file = file, row = tonumber(row) })
-					table.insert(entries, entry)
-				end
+				if not file then return nil end
+				return M.picker_entry.new(line, { file = file, row = tonumber(row) })
 			end
-			-- can't call directly in fast mode
-			vim.schedule(function() callback(entries) end)
+			nonblocking_process_stdout(result.stdout, transform, callback)
 		end)
 	end
 	local function on_cancel(_)
