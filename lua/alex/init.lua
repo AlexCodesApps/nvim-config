@@ -39,4 +39,6 @@ vim.o.indentexpr = 'nvim_treesitter#indent()'
 vim.o.showtabline = 0
 vim.o.shortmess = vim.o.shortmess .. 'I'
 
+vim.cmd.packadd("cfilter")
+
 require('alex.projconf')
