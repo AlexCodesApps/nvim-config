@@ -13,8 +13,6 @@ vim.keymap.set('n', '<C-l>', '<C-w><C-l>')
 vim.keymap.set({'n', 'x'}, '<leader>y', '"+y')
 vim.keymap.set({'n', 'x'}, '<leader>p', '"+p')
 vim.keymap.set({'n', 'x'}, '<leader>P', '"+P')
-vim.keymap.set({'n', 't'}, '<C-x>z', require('alex.floaterm').toggle)
-vim.keymap.set({'n', 't'}, '<C-x><C-z>', require('alex.floaterm').toggle)
 vim.keymap.set({'n', 'x'}, '<S-Tab>', function()
 	if vim.w.focused_window then
 		local winid = vim.w.focused_window
