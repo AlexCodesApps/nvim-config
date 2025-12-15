@@ -56,17 +56,23 @@ end
 ---@type alex.ffind.Picker?
 local g_picker = nil
 
+---@class alex.ffind.NBProcessStdoutOpts
+---@field cancel? fun(): boolean
+---@field yield_count? integer
+
+---@generic T
 ---@param input string
----@param transform fun(line: string): alex.ffind.PickerEntry?
----@param callback fun(entries: alex.ffind.PickerEntry[])
----@param yield_count? integer
-local function nonblocking_process_stdout(input, transform, callback, yield_count)
-	local handle = assert(g_picker).state.sync_handle
-	yield_count = yield_count or 50
+---@param transform fun(line: string): T?
+---@param callback fun(entries: T[])
+---@param opts? alex.ffind.NBProcessStdoutOpts
+local function nonblocking_process_stdout(input, transform, callback, opts)
+	opts = opts or {}
+	local yield_count = opts.yield_count or 50
+	local cancel = opts.cancel
 	local function yield()
 		local co = coroutine.running()
 			vim.schedule(function()
-				if g_picker and g_picker.state.sync_handle == handle then
+				if not cancel or not cancel() then
 					coroutine.resume(co)
 				end
 			end)
@@ -98,27 +104,29 @@ end
 ---@param prefix? string
 ---@param exclude_pattern? string
 ---@param gitignore boolean
----@param callback fun(files: string[])
+---@param callback fun(files: alex.ffind.PickerEntry[])
 local function fetch_recursive_files(cwd, prefix, exclude_pattern, gitignore, callback)
 	prefix = prefix or ""
 	local cmd
 	if gitignore then
 		cmd = { "rg", "--files" }
 	else
-		cmd = { "rg", "--no-ignore", "--files" }
+		cmd = { "rg", "-uu", "--files" }
 	end
 	vim.system(cmd, {
 		cwd = cwd,
 	}, function(result)
 		local output = result.stdout
 		assert(output)
-		local files = {}
-		for line in vim.gsplit(output, "\n") do
+		local function transform(line)
 			if line ~= "" and (not exclude_pattern or line:match(exclude_pattern)) then
-				table.insert(files, prefix .. line)
+				return M.picker_entry.new(line, nil)
 			end
+			return nil
 		end
-		vim.schedule(function() callback(files) end)
+		nonblocking_process_stdout(output, transform, callback, {
+			yield_count = 500,
+		})
 	end)
 end
 
@@ -175,12 +183,7 @@ local function picker_draw()
 		table.insert(screen_lines, g_picker.state.filtered[i + g_picker.state.s_offset].text)
 	end
 	vim.api.nvim_buf_set_lines(g_picker.outer.buf, 0, -1, false, screen_lines)
-	local cursor_pos
-	if nentry ~= 0 then
-		cursor_pos = { math.max(nentry - g_picker.state.c_offset, 1), 0 }
-	else
-		cursor_pos = { 1, 0 }
-	end
+	local cursor_pos = { math.max(nentry - g_picker.state.c_offset, 1), 0 }
 	vim.api.nvim_win_set_cursor(g_picker.outer.win, cursor_pos)
 end
 
@@ -514,8 +517,7 @@ function M.find_file(config)
 		on_select = on_select,
 		to_qflist = to_qflist,
 	}
-	fetch_recursive_files(path, "", exclude_pattern, gitignore, function(files)
-		local entries = M.picker_entry.from_list(files)
+	fetch_recursive_files(path, "", exclude_pattern, gitignore, function(entries)
 		M.open_picker(entries, {
 			title = "Find File",
 			actions = actions,
@@ -552,12 +554,16 @@ function M.grep_files(config)
 		running_future = vim.system(cmd, { cwd = cwd, text = true }, function(result)
 			running_future = nil
 			if not g_picker then return end
-			local transform = function(line)
+			local function transform(line)
 				local file, row = string.match(line, "^([^:]+):(%d+):")
 				if not file then return nil end
 				return M.picker_entry.new(line, { file = file, row = tonumber(row) })
 			end
-			nonblocking_process_stdout(result.stdout, transform, callback)
+			local handle = g_picker.state.sync_handle
+			local function cancel()
+				return not g_picker or g_picker.state.sync_handle ~= handle
+			end
+			nonblocking_process_stdout(result.stdout, transform, callback, { cancel = cancel })
 		end)
 	end
 	local function on_cancel(_)
@@ -796,18 +802,18 @@ function M.find_manpage()
 			if obj.stdout == nil then
 				error("couldn't grab manpages")
 			end
-			local entries = {}
-			for line in vim.gsplit(obj.stdout, "\n") do
+			local function transform(line)
 				local entry, part = string.match(line, "^([^%s]+)%s([^%s]+)")
-				if entry then
-					table.insert(entries, M.picker_entry.new(entry .. part, nil))
+				if not entry then return nil end
+				return M.picker_entry.new(entry .. part, nil)
+			end
+			nonblocking_process_stdout(obj.stdout, transform, function(entries)
+				manpage_promise.result = entries
+				for _, listener in ipairs(manpage_promise.listeners) do
+					listener(entries)
 				end
-			end
-			manpage_promise.result = entries
-			for _, listener in ipairs(manpage_promise.listeners) do
-				vim.schedule(function() listener(entries) end)
-			end
-			manpage_promise.listeners = nil
+				manpage_promise.listeners = nil
+			end)
 		end)
 	end
 	local function on_select(selected, winmode)
