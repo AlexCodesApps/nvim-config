@@ -1,6 +1,6 @@
 require('alex.remap')
 
-vim.api.nvim_create_user_command('Cswitch', function()
+vim.api.nvim_create_user_command('CSwitch', function()
 	local path = vim.api.nvim_buf_get_name(0)
 	local filename, extension = path:gsub('\\', '/'):match([[/([^/]+)%.(%a+)$]])
 	if not filename then

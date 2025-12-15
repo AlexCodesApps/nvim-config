@@ -22,7 +22,7 @@ if 1 == vim.fn.executable 'hyprctl' then
 	end
 end
 
----@class alex.Overrides.InputOpts
+---@class alex.overrides.InputOpts
 ---@field prompt? string
 ---@field default? string
 ---@field completion? string
@@ -31,7 +31,7 @@ end
 
 local terminate = nil
 
----@param opts alex.Overrides.InputOpts
+---@param opts alex.overrides.InputOpts
 ---@param on_confirm function
 ---@diagnostic disable-next-line: duplicate-set-field
 vim.ui.input = function(opts, on_confirm)
@@ -108,14 +108,14 @@ vim.ui.input = function(opts, on_confirm)
 	vim.cmd('startinsert!')
 end
 
----@class alex.Overrides.SelectOpts
+---@class alex.overrides.SelectOpts
 ---@field prompt? string
 ---@field format_item function
 ---@field kind? string
 
 ---@generic T
 ---@param items T[]
----@param opts alex.Overrides.SelectOpts
+---@param opts alex.overrides.SelectOpts
 ---@param on_choice fun(item: T|nil, idx: integer|nil)
 ---@diagnostic disable-next-line: duplicate-set-field
 vim.ui.select = function(items, opts, on_choice)

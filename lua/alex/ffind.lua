@@ -448,8 +448,7 @@ function M.default_sorter(entries, input, callback)
 		local result = {}
 		local i = 0
 		for _, entry in ipairs(entries) do
-			entry[INTERNAL_KEY] = nil -- VimScript FFI doesn't allow this field
-			local lists = vim.fn.matchfuzzypos({ entry }, input, { key = "text" })
+			local lists = vim.fn.matchfuzzypos({ entry.text }, input)
 			if #lists[1] ~= 0 then
 				entry[INTERNAL_KEY] = lists[3][1] -- The entries score is stored here
 				sorted_insert(result, entry)

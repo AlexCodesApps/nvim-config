@@ -1,13 +1,13 @@
 local M = {}
 
----@class alex.float.win_config
+---@class alex.float.WinConfig
 ---@field enter? boolean
 ---@field width? number
 ---@field height? number
 
 ---creates a new floating window, hidden by default
 ---@param buffer integer
----@param opts alex.float.win_config
+---@param opts alex.float.WinConfig
 ---@return integer
 function M.open_floating_window(buffer, opts)
 	local enter = opts.enter or true
