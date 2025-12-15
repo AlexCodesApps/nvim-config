@@ -783,39 +783,40 @@ function M.workspace_symbols()
 	})
 end
 
-local manpage_promise = nil
-function M.find_manpage()
-	local function fetch_manpage_entries(callback)
-		if manpage_promise ~= nil then
-			if not manpage_promise.result then
-				table.insert(manpage_promise.listeners, callback)
-			else
-				callback(manpage_promise.result)
-			end
-			return
+local manpage_cache = nil
+local function fetch_manpage_entries(callback)
+	if manpage_cache ~= nil then
+		if not manpage_cache.result then
+			table.insert(manpage_cache.listeners, callback)
+		else
+			callback(manpage_cache.result)
 		end
-		manpage_promise = {
-			listeners = { callback },
-			result = nil,
-		}
-		vim.system({ "apropos", "." }, { text = true }, function(obj)
-			if obj.stdout == nil then
-				error("couldn't grab manpages")
-			end
-			local function transform(line)
-				local entry, part = string.match(line, "^([^%s]+)%s([^%s]+)")
-				if not entry then return nil end
-				return M.picker_entry.new(entry .. part, nil)
-			end
-			nonblocking_process_stdout(obj.stdout, transform, function(entries)
-				manpage_promise.result = entries
-				for _, listener in ipairs(manpage_promise.listeners) do
-					listener(entries)
-				end
-				manpage_promise.listeners = nil
-			end)
-		end)
+		return
 	end
+	manpage_cache = {
+		listeners = { callback },
+		result = nil,
+	}
+	vim.system({ "apropos", "." }, { text = true }, function(obj)
+		if obj.stdout == nil then
+			error("couldn't grab manpages")
+		end
+		local function transform(line)
+			local entry, part = string.match(line, "^([^%s]+)%s([^%s]+)")
+			if not entry then return nil end
+			return M.picker_entry.new(entry .. part, nil)
+		end
+		nonblocking_process_stdout(obj.stdout, transform, function(entries)
+			manpage_cache.result = entries
+			for _, listener in ipairs(manpage_cache.listeners) do
+				listener(entries)
+			end
+			manpage_cache.listeners = nil
+		end)
+	end)
+end
+
+function M.find_manpage()
 	local function on_select(selected, winmode)
 		if not selected then return end
 		if winmode ~= "split" then
