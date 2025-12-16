@@ -474,7 +474,9 @@ local function edit_file(winmode, path)
 		hsplit = "new ",
 		vsplit = "vnew ",
 	}
-	vim.cmd(table[winmode] .. vim.fn.fnameescape(path))
+	if vim.api.nvim_get_current_buf() ~= vim.fn.bufnr(path) then
+		vim.cmd(table[winmode] .. vim.fn.fnameescape(path))
+	end
 end
 
 ---@class alex.ffind.FindFileConfig
@@ -485,7 +487,7 @@ end
 ---@param config? alex.ffind.FindFileConfig
 function M.find_file(config)
 	config = config or {}
-	local path = config.cwd or vim.fn.getcwd()
+	local cwd = config.cwd or vim.fn.getcwd()
 	local exclude_pattern = config.exclude_pattern
 	local gitignore = config.gitignore or false
 	---@param entry alex.ffind.PickerEntry?
@@ -493,15 +495,16 @@ function M.find_file(config)
 	local function on_select(entry, winmode)
 		if not entry then return end
 		local line = entry.text
-		edit_file(winmode, path .. "/" .. line)
+		local path = vim.fs.joinpath(cwd, line)
+		edit_file(winmode, path)
 	end
 	---@param entries alex.ffind.PickerEntry[]
 	local function to_qflist(entries)
 		local qflist = vim.tbl_map(function(entry)
 			local line = entry.text
-			local fpath = path .. "/" .. line
+			local path = vim.fs.joinpath(cwd, line)
 			return  {
-				filename = fpath,
+				filename = path,
 				lnum = 1,
 				col = 1,
 				text = line,
@@ -517,7 +520,7 @@ function M.find_file(config)
 		on_select = on_select,
 		to_qflist = to_qflist,
 	}
-	fetch_recursive_files(path, "", exclude_pattern, gitignore, function(entries)
+	fetch_recursive_files(cwd, "", exclude_pattern, gitignore, function(entries)
 		M.open_picker(entries, {
 			title = "Find File",
 			actions = actions,
