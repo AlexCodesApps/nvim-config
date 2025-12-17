@@ -1,34 +1,8 @@
 require('alex.remap')
 
-vim.api.nvim_create_user_command('CSwitch', function()
-	local path = vim.api.nvim_buf_get_name(0)
-	local filename, extension = path:gsub('\\', '/'):match([[/([^/]+)%.(%a+)$]])
-	if not filename then
-		vim.notify('no extension found')
-		return
-	end
-	local ext_table = {
-		['c'] = 'h',
-		['h'] = 'c',
-		['cpp'] = 'hpp',
-		['hpp'] = 'cpp',
-	}
-	local extension2 = ext_table[extension]
-	if extension2 == nil then
-		vim.notify('unknown extension [.' .. extension .. ']')
-		return
-	end
-	local files = vim.fn.findfile(filename .. '.' .. extension2, '**', -1)
-	if #files == 0 then
-		vim.notify('no candidates found')
-		return
-	end
-	if #files ~= 1 then
-		vim.notify('multiple candidates found')
-		return
-	end
-	vim.cmd('e ' .. vim.fn.fnameescape(files[1]))
-end, {})
+local cswitch = require('alex.cswitch')
+
+vim.api.nvim_create_user_command('CSwitch', cswitch.cswitch, {})
 
 vim.api.nvim_create_user_command('MkMdTable', function(opts)
 	local input = vim.api.nvim_buf_get_lines(0, opts.line1 - 1, opts.line2, true)
