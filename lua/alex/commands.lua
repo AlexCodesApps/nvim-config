@@ -99,3 +99,8 @@ local swap_files_open_cmd = 'Explore ' .. vim.fn.stdpath('state') .. '/swap'
 vim.api.nvim_create_user_command('SwapFilesOpen', function()
 	vim.cmd(swap_files_open_cmd)
 end, {})
+
+vim.api.nvim_create_user_command('WrappedScroll', function()
+	vim.keymap.set('n', 'j', 'gj', { buffer = true })
+	vim.keymap.set('n', 'k', 'gk', { buffer = true })
+end, {})
