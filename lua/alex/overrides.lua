@@ -110,7 +110,7 @@ end
 
 ---@class alex.overrides.SelectOpts
 ---@field prompt? string
----@field format_item function
+---@field format_item? function
 ---@field kind? string
 
 ---@generic T

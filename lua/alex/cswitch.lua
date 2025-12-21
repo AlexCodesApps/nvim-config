@@ -70,12 +70,15 @@ function M.cswitch()
 		vim.notify('No candidates found')
 		return
 	end
-	if #files ~= 1 then
-		vim.notify('Multiple candidates found')
-		vim.print(files)
-		return
+	local function on_select(file)
+		if not file then return end
+		vim.cmd('e ' .. vim.fn.fnameescape(file))
 	end
-	vim.cmd('e ' .. vim.fn.fnameescape(files[1]))
+	if #files == 1 then
+		on_select(files[1])
+	else
+		vim.ui.select(files, { prompt = "Select Candidate File:" }, on_select)
+	end
 end
 
 M.add_extension_pairs({
