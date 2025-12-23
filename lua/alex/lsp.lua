@@ -1,20 +1,5 @@
 vim.diagnostic.config { virtual_text = true }
 
-local filetype_tabsize_table = {
-	html = 2,
-	css = 2,
-}
-
-vim.api.nvim_create_autocmd('LspAttach', {
-	callback = function (_)
-		local tab_width = filetype_tabsize_table[vim.bo.filetype]
-		if tab_width ~= nil then
-			vim.bo.tabstop = tab_width
-			vim.bo.shiftwidth = tab_width
-		end
-	end
-})
-
 vim.api.nvim_create_user_command('LspRestart', function ()
 	local lsps = vim.lsp.get_clients()
 	for _, lsp in ipairs(lsps) do
