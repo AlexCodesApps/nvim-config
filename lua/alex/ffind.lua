@@ -40,8 +40,8 @@ function M.picker_entry.from_list(list)
 	return vim.tbl_map(helper, list)
 end
 
-local function qflist_next()
-	pcall(function() vim.cmd("cnext") end)
+local function qflist_first()
+	pcall(function() vim.cmd("cfirst") end)
 end
 
 ---@class alex.ffind.Picker
@@ -196,10 +196,10 @@ local function reset_picker_window()
 		picker_draw()
 	end
 	if input ~= "" then
-		local sync_handle = {}
-		g_picker.state.sync_handle = sync_handle
+		local handle = {}
+		g_picker.state.sync_handle = handle
 		g_picker.sorter(g_picker.entries, input, function(entries)
-			if not g_picker or g_picker.state.sync_handle ~= sync_handle then
+			if not g_picker or g_picker.state.sync_handle ~= handle then
 				return
 			end
 			g_picker.state.filtered = entries
@@ -523,7 +523,7 @@ function M.find_file(config)
 			title = "Find File results",
 			items = qflist,
 		})
-		qflist_next()
+		qflist_first()
 	end
 	local actions = { ---@type alex.ffind.Actions
 		on_select = on_select,
@@ -608,7 +608,7 @@ function M.grep_files(config)
 			title = "Live Grep results",
 			items = qflist,
 		})
-		qflist_next()
+		qflist_first()
 	end
 	local actions = { ---@type alex.ffind.Actions
 		on_select = on_select,
@@ -665,7 +665,7 @@ function M.find_buffer()
 			title = "Find Buffer results",
 			items = qflist,
 		})
-		qflist_next()
+		qflist_first()
 	end
 	M.open_picker(entries, {
 		title = "Find Buffer",
@@ -765,7 +765,7 @@ local function open_picker_qf_symbol_list(list)
 			title = "LSP Symbol results",
 			items = qflist,
 		})
-		qflist_next()
+		qflist_first()
 	end
 	M.open_picker(entries, {
 		title = "LSP Symbols",
