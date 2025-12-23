@@ -31,18 +31,12 @@ local function load_config()
 	loaded_configs = {}
 	local jobs = {}
 	vim.fn.mkdir(state_dir, 'p')
-	local cwd = vim.fn.getcwd()
-	while true do
+	for cwd in vim.fs.parents(vim.fn.getcwd() .. '/.') do
 		local path = get_config_path(cwd)
 		if fs_stat(path) then
 			table.insert(loaded_configs, cwd)
 			table.insert(jobs, vim.fn.fnameescape(path))
 		end
-		local nextcwd = cwd:match('^(.*)/')
-		if not nextcwd then
-			break
-		end
-		cwd = nextcwd
 	end
 	for i=#jobs,1,-1 do
 		vim.cmd.luafile(jobs[i]) -- outer configs are loaded first
