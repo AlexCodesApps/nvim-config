@@ -103,3 +103,25 @@ vim.keymap.set('n', '<leader>dw', function()
 	}
 end)
 vim.keymap.set('n', '<leader>da', vim.diagnostic.setqflist)
+
+
+vim.keymap.set('n', '<leader>fdr', function()
+	local rustdoc = require('alex.rustdoc')
+	local syms = rustdoc.get_docs()
+	if not syms then return end
+	local entries = vim.tbl_map(function(sym)
+		return ffind.picker_entry.new(string.format('[%s] %s', sym.category, sym.name), sym)
+	end, syms)
+	ffind.open_picker(entries, {
+		actions = {
+			on_select = function(entry, winmode)
+				if winmode == 'vsplit' then
+					vim.cmd('vnew')
+				elseif winmode == 'hsplit' then
+					vim.cmd('new')
+				end
+				rustdoc.open_file(entry.data.file)
+			end
+		}
+	})
+end)
