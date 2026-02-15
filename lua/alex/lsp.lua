@@ -1,5 +1,5 @@
 vim.diagnostic.config { virtual_text = true }
-vim.lsp.set_log_level("OFF")
+vim.lsp.log.set_level(vim.log.levels.OFF)
 
 vim.api.nvim_create_user_command('LspRestart', function ()
 	local lsps = vim.lsp.get_clients()

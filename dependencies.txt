@@ -1,4 +1,5 @@
 rg
+fd
 clangd
 lua-language-server
 typescript-language-server

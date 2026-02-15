@@ -128,25 +128,11 @@ end
 
 ---@param file string
 function M.open_file(file)
-	local name = string.format("rustdoc://%s", file)
-	if vim.fn.bufexists(name) == 1 then
-		vim.cmd.buffer(vim.fn.fnameescape(name))
-		return
+	if os.getenv("TMUX") then
+		vim.fn.system({"tmux", "split-window", "lynx", "-vikeys", "--", file})
+	else
+		vim.cmd("vert term lynx -vikeys -- " .. vim.fn.fnameescape(file))
 	end
-	local lines = vim.fn.systemlist(
-		{"lynx", "-dump", "-width=1024", "-hiddenlinks=ignore", "--", file})
-	local buf = vim.api.nvim_create_buf(false, true)
-	vim.api.nvim_buf_set_name(buf, name)
-	vim.api.nvim_buf_set_lines(buf, 0, -1, false, lines)
-	vim.api.nvim_set_current_buf(buf)
-	vim.cmd("1,2d")
-	vim.cmd("%s/\\[.*\\]//g")
-	vim.cmd("/^References$/,$d")
-	vim.cmd("1")
-	vim.cmd.set("readonly")
-	vim.cmd.setlocal("nomodifiable")
-	vim.cmd.set("bufhidden=delete")
-	vim.cmd.setfiletype("rust")
 end
 
 return M

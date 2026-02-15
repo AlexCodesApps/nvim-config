@@ -1,7 +1,5 @@
 local M = {}
 
-local INTERNAL_KEY = {} -- to use as a private field key value
-
 ---@class alex.ffind.PickerEntry
 ---@field text string
 ---@field data any
@@ -26,10 +24,11 @@ end
 ---@alias alex.ffind.WinMode "split"|"hsplit"|"vsplit"
 
 ---@class alex.ffind.Actions
----@field on_select fun(entry: alex.ffind.PickerEntry?, winmode: alex.ffind.WinMode)
+---@field on_select? fun(entry: alex.ffind.PickerEntry?, winmode: alex.ffind.WinMode)
 ---@field on_cancel? fun(selected: boolean)
 ---@field to_qflist? fun(entries: alex.ffind.PickerEntry[])
 ---@field to_loclist? fun(entries: alex.ffind.PickerEntry[])
+---@field on_hover? fun(entry: alex.ffind.PickerEntry?)
 
 ---@param list string[]
 ---@return alex.ffind.PickerEntry[]
@@ -59,6 +58,7 @@ local g_picker = nil
 ---@class alex.ffind.NBProcessStdoutOpts
 ---@field cancel? fun(): boolean
 ---@field yield_count? integer
+---@field backwards? boolean
 
 ---@generic T
 ---@param input string
@@ -68,6 +68,7 @@ local g_picker = nil
 local function nonblocking_process_stdout(input, transform, callback, opts)
 	opts = opts or {}
 	local yield_count = opts.yield_count or 50
+	local backwards = opts.backwards or false
 	local cancel = opts.cancel
 	local function yield()
 		local co = coroutine.running()
@@ -78,6 +79,12 @@ local function nonblocking_process_stdout(input, transform, callback, opts)
 			end)
 		coroutine.yield()
 	end
+	local insert
+	if not backwards then
+		insert = function(e, i) table.insert(e, i) end
+	else
+		insert = function(e, i) table.insert(e, 1, i) end
+	end
 	local function run(cb)
 		coroutine.resume(coroutine.create(cb))
 	end
@@ -87,7 +94,7 @@ local function nonblocking_process_stdout(input, transform, callback, opts)
 		for line in vim.gsplit(input, "\n") do
 			local entry = transform(line)
 			if entry then
-				table.insert(entries, entry)
+				insert(entries, entry)
 			end
 			i = i + 1
 			if i >= yield_count then
@@ -100,6 +107,25 @@ local function nonblocking_process_stdout(input, transform, callback, opts)
 	end)
 end
 
+local fetch_file_cmds = nil
+---@param gitignore boolean
+local function get_fetch_file_cmd(gitignore)
+	if fetch_file_cmds == nil then
+		if 1 == vim.fn.executable "fd" then
+			fetch_file_cmds = {
+				[true] = { "fd", "-t", "f" },
+				[false] = { "fd", "-u", "-t", "f" },
+			}
+		else
+			fetch_file_cmds = {
+				[true] = { "rg" },
+				[false] = { "rg", "-uu" }
+			}
+		end
+	end
+	return fetch_file_cmds[gitignore]
+end
+
 ---@param cwd string
 ---@param prefix? string
 ---@param exclude_pattern? string
@@ -107,12 +133,7 @@ end
 ---@param callback fun(files: alex.ffind.PickerEntry[])
 local function fetch_recursive_files(cwd, prefix, exclude_pattern, gitignore, callback)
 	prefix = prefix or ""
-	local cmd
-	if gitignore then
-		cmd = { "rg", "--files" }
-	else
-		cmd = { "rg", "-uu", "--files" }
-	end
+	local cmd = get_fetch_file_cmd(gitignore)
 	vim.system(cmd, {
 		cwd = cwd,
 	}, function(result)
@@ -174,6 +195,21 @@ local function picker_cursor_offset_max()
 	return math.min(picker_entry_window_height(), #g_picker.state.filtered) - 1
 end
 
+---@return alex.ffind.PickerEntry?
+local function get_selected_field()
+	assert(g_picker)
+	return g_picker.state.filtered[g_picker.state.s_offset + g_picker.state.c_offset + 1]
+end
+
+local function picker_on_hover()
+	assert(g_picker)
+	local hoverfn = g_picker.actions.on_hover
+	if hoverfn then
+		local selected = get_selected_field()
+		hoverfn(selected)
+	end
+end
+
 local function picker_draw()
 	assert(g_picker)
 	local screen_lines = {}
@@ -185,6 +221,7 @@ local function picker_draw()
 	vim.api.nvim_buf_set_lines(g_picker.outer.buf, 0, -1, false, screen_lines)
 	local cursor_pos = { math.max(nentry - g_picker.state.c_offset, 1), 0 }
 	vim.api.nvim_win_set_cursor(g_picker.outer.win, cursor_pos)
+	picker_on_hover()
 end
 
 local function reset_picker_window()
@@ -260,12 +297,6 @@ local function scroll_screen_down()
 	end
 	g_picker.state.s_offset = g_picker.state.s_offset - 1
 	picker_draw()
-end
-
----@return alex.ffind.PickerEntry?
-local function get_selected_field()
-	assert(g_picker)
-	return g_picker.state.filtered[g_picker.state.s_offset + g_picker.state.c_offset + 1]
 end
 
 local function move_screen_cursor_top()
@@ -378,6 +409,7 @@ function M.open_picker(entries, config)
 			local selected = get_selected_field()
 			local cb = g_picker.actions.on_select
 			terminate_picker(true)
+			if not cb then return end
 			cb(selected, winmode)
 		end
 	end
@@ -441,13 +473,14 @@ function M.default_sorter(entries, input, callback)
 	local function run(cb)
 		coroutine.resume(coroutine.create(cb))
 	end
+	local score_tbl = {}
 	local function sorted_insert(tbl, ent)
-		local score = ent[INTERNAL_KEY]
+		local score = score_tbl[ent]
 		local low = 1
 		local high = #tbl + 1
 		while low < high do
 			local g = math.floor((low + high) / 2)
-			local score2 = tbl[g][INTERNAL_KEY]
+			local score2 = score_tbl[tbl[g]]
 			if score2 >= score then
 				low = g + 1
 			else
@@ -462,7 +495,7 @@ function M.default_sorter(entries, input, callback)
 		for _, entry in ipairs(entries) do
 			local lists = vim.fn.matchfuzzypos({ entry.text }, input)
 			if #lists[1] ~= 0 then
-				entry[INTERNAL_KEY] = lists[3][1] -- The entries score is stored here
+				score_tbl[entry] = lists[3][1] -- The entries score is stored here
 				sorted_insert(result, entry)
 			end
 			i = i + 1
@@ -575,7 +608,7 @@ function M.grep_files(config)
 			local function cancel()
 				return not g_picker or g_picker.state.sync_handle ~= handle
 			end
-			nonblocking_process_stdout(result.stdout, transform, callback, { cancel = cancel })
+			nonblocking_process_stdout(result.stdout, transform, callback, { cancel = cancel, backwards = true })
 		end)
 	end
 	local function on_cancel(_)
@@ -746,7 +779,7 @@ local function open_picker_qf_symbol_list(list)
 	local function on_select(entry, winmode)
 		if not entry then return end
 		local item = entry.data ---@type alex.ffind.QfSymbolEntry
-		if item.filename ~= vim.api.nvim_buf_get_name(0) then
+		if item.filename ~= vim.api.nvim_buf_get_name(0) or winmode ~= "split" then
 			local table = {
 				split = "edit ",
 				hsplit = "new ",
@@ -862,14 +895,21 @@ function M.find_colorscheme()
 			end
 		end
 	end
-	local function on_select(selected, _)
+	local function on_hover(selected)
 		if not selected then return end
 		vim.cmd.colorscheme(selected.text)
+	end
+	local cur = vim.g.colors_name
+	local function on_cancel(chosen)
+		if not chosen then
+			vim.cmd.colorscheme(cur)
+		end
 	end
 	M.open_picker(cached_colorschemes, {
 		title = "Choose Colorscheme",
 		actions = {
-			on_select = on_select
+			on_hover = on_hover,
+			on_cancel = on_cancel
 		}
 	})
 end
