@@ -895,13 +895,20 @@ function M.find_colorscheme()
 			end
 		end
 	end
+	local timer = nil
 	local function on_hover(selected)
+		if timer then
+			vim.fn.timer_stop(timer)
+		end
 		if not selected then return end
-		vim.cmd.colorscheme(selected.text)
+		timer = vim.fn.timer_start(50, function()
+			vim.cmd.colorscheme(selected.text)
+		end)
 	end
 	local cur = vim.g.colors_name
 	local function on_cancel(chosen)
 		if not chosen then
+			if timer then vim.fn.timer_stop(timer) end
 			vim.cmd.colorscheme(cur)
 		end
 	end

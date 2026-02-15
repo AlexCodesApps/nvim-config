@@ -2,10 +2,12 @@ local M = {}
 
 local state = {}
 
+local uv = vim.uv or vim.loop or {}
+
 function M.home_dir()
 	if not state.home then
 ---@diagnostic disable-next-line: undefined-field
-		state.home = (vim.uv or vim.loop).os_homedir()
+		state.home = uv.os_homedir()
 	end
 	return state.home
 end
