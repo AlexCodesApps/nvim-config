@@ -30,15 +30,6 @@ end
 ---@field to_loclist? fun(entries: alex.ffind.PickerEntry[])
 ---@field on_hover? fun(entry: alex.ffind.PickerEntry?)
 
----@param list string[]
----@return alex.ffind.PickerEntry[]
-function M.picker_entry.from_list(list)
-	local function helper(text)
-		return M.picker_entry.new(text, nil)
-	end
-	return vim.tbl_map(helper, list)
-end
-
 local function qflist_first()
 	pcall(function() vim.cmd("cfirst") end)
 end
@@ -118,8 +109,8 @@ local function get_fetch_file_cmd(gitignore)
 			}
 		else
 			fetch_file_cmds = {
-				[true] = { "rg" },
-				[false] = { "rg", "-uu" }
+				[true] = { "rg", "--files" },
+				[false] = { "rg", "-uu", "--files" }
 			}
 		end
 	end
