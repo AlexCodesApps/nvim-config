@@ -2,6 +2,7 @@ local M = {}
 
 local blacklist = {}
 local exttable = {}
+local filepairs = {}
 
 ---@param path string
 ---@return string?, string?
@@ -21,6 +22,13 @@ function M.block_file(path)
 	path = realpath(path)
 	assert(path)
 	table.insert(blacklist, path)
+end
+
+function M.add_file_pair(a, b)
+	a = realpath(a)
+	b = realpath(b)
+	filepairs[a] = b
+	filepairs[b] = a
 end
 
 ---@param pair string[]
@@ -45,7 +53,16 @@ function M.add_extension_pairs(pairs)
 end
 
 function M.cswitch()
+	local function on_select(file)
+		if not file then return end
+		vim.cmd('e ' .. vim.fn.fnameescape(file))
+	end
 	local path = vim.api.nvim_buf_get_name(0)
+	path = realpath(path)
+	if filepairs[path] ~= nil then
+		on_select(filepairs[path])
+		return
+	end
 	local name, ext = split_filepath(path)
 	if not name then
 		vim.notify('No extension found')
@@ -70,23 +87,11 @@ function M.cswitch()
 		vim.notify('No candidates found')
 		return
 	end
-	local function on_select(file)
-		if not file then return end
-		vim.cmd('e ' .. vim.fn.fnameescape(file))
-	end
 	if #files == 1 then
 		on_select(files[1])
 	else
 		vim.ui.select(files, { prompt = "Select Candidate File:" }, on_select)
 	end
 end
-
-M.add_extension_pairs({
-	{ 'c', 'h', },
-	{ 'cc', 'hh' },
-	{ 'cpp', 'hpp' },
-	{ 'js', 'html' },
-	{ 'ts', 'html' },
-})
 
 return M

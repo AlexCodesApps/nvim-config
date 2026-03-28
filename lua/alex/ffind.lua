@@ -890,6 +890,7 @@ function M.find_colorscheme()
 	local function on_hover(selected)
 		if timer then
 			vim.fn.timer_stop(timer)
+			timer = nil
 		end
 		if not selected then return end
 		timer = vim.fn.timer_start(50, function()

@@ -41,4 +41,12 @@ vim.o.shortmess = vim.o.shortmess .. 'I'
 
 vim.cmd.packadd("cfilter")
 
+require('alex.cswitch').add_extension_pairs({
+	{ 'c', 'h', },
+	{ 'cc', 'hh' },
+	{ 'cpp', 'hpp' },
+	{ 'js', 'html' },
+	{ 'ts', 'html' },
+})
+
 require('alex.projconf')

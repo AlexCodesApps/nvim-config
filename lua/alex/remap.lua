@@ -13,6 +13,8 @@ vim.keymap.set('n', '<C-l>', '<C-w><C-l>')
 vim.keymap.set({'n', 'x'}, '<leader>y', '"+y')
 vim.keymap.set({'n', 'x'}, '<leader>p', '"+p')
 vim.keymap.set({'n', 'x'}, '<leader>P', '"+P')
+vim.keymap.set('c', '<C-a>', '<Home>')
+vim.keymap.set('c', '<C-e>', '<End>')
 vim.keymap.set({'n', 'x'}, '<S-Tab>', function()
 	if vim.w.focused_window then
 		local winid = vim.w.focused_window
@@ -36,12 +38,17 @@ for i=0,9 do
 	vim.keymap.set('n', ('<M-%d>'):format(i), ('%dgt'):format(i))
 end
 
+---@param input string
+local function insert_html_tag(input)
+	local output = ('<%s></%s>'):format(input, input)
+	vim.api.nvim_paste(output, false, -1)
+	vim.cmd('norm ' .. tostring(#input + 3) .. 'h')
+end
+
 vim.keymap.set({'n'}, '<leader>t', function()
 	local function on_input(input)
 		if not input or input == '' then return end
-		local output = ('<%s></%s>'):format(input, input)
-		vim.api.nvim_paste(output, false, -1)
-		vim.cmd('norm ' .. tostring(#input + 3) .. 'h')
+		insert_html_tag(input)
 	end
 	vim.ui.input({
 		prompt = 'Enter the HTML tag: ',
@@ -51,9 +58,7 @@ end)
 vim.keymap.set('i', '<C-t>', function()
 	local function on_input(input)
 		if not input or input == '' then return end
-		local output = ('<%s></%s>'):format(input, input)
-		vim.api.nvim_paste(output, false, -1)
-		vim.cmd('norm ' .. tostring(#input + 3) .. 'h')
+		insert_html_tag(input)
 	end
 	vim.ui.input({
 		prompt = 'Enter the HTML tag: ',

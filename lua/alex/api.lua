@@ -2,7 +2,7 @@ local M = {}
 
 local state = {}
 
-local uv = vim.uv or vim.loop or {}
+local uv = vim.uv or vim.loop
 
 function M.home_dir()
 	if not state.home then
