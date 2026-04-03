@@ -22,7 +22,7 @@ if 1 == vim.fn.executable 'hyprctl' then
 	end
 elseif 1 == vim.fn.executable 'notify-send' then
 	---@diagnostic disable-next-line: duplicate-set-field
-	vim.notify = function(msg, level, _)
+	vim.notify = function(msg, _, _)
 		vim.system {
 			'notify-send',
 			'--expire-time=3000',
