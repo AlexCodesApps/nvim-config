@@ -74,7 +74,6 @@ vim.ui.input = function(opts, on_confirm)
 		col = 0,
 	})
 	vim.wo[win].winhl = 'Normal:Normal,FloatBorder:Normal'
-	vim.api.nvim_buf_set_lines(buf, 0, -1, false, { prompt .. default })
 	local augroup = vim.api.nvim_create_augroup('AlexOverrideInput', {
 		clear = true,
 	})
@@ -84,33 +83,26 @@ vim.ui.input = function(opts, on_confirm)
 		vim.cmd.stopinsert()
 		terminate = nil
 	end
-	local prompt_len = prompt:len()
-	local insert_keys = '<Esc>A'
-	local insert_keycodes = vim.api.nvim_replace_termcodes(insert_keys, true, false, true)
-	vim.api.nvim_create_autocmd({ "TextChanged", "TextChangedI" }, {
+	local ns = vim.api.nvim_create_namespace('AlexOverrideInput')
+	vim.api.nvim_buf_set_lines(buf, 0, -1, false, { default })
+	local _ = vim.api.nvim_buf_set_extmark(buf, ns, 0, 0, {
+		virt_text = {{ prompt, 'Normal' }},
+		virt_text_pos = 'inline',
+		right_gravity = false,
+	})
+	vim.api.nvim_create_autocmd({ 'TextChanged', 'TextChangedI' }, {
 		group = augroup,
 		buffer = buf,
 		callback = function()
-			local lines = vim.api.nvim_buf_get_lines(buf, 0, -1, false)
-			if #lines > 1 then
+			if vim.fn.line('$') > 1 then
 				terminate()
 				vim.notify('new-lines here are unsupported!')
 				return
 			end
-			local line = lines[1]
-			if not line or not vim.startswith(line, prompt) then
-				vim.api.nvim_buf_set_lines(buf, 0, -1, false, { prompt })
-				if vim.api.nvim_get_mode().mode:match('^i') then
-					vim.api.nvim_feedkeys(insert_keycodes, 'n', false)
-				else
-					vim.cmd('normal $')
-				end
-			end
 		end
 	})
 	vim.keymap.set({ 'i', 'n' }, '<Enter>', function()
-		local line = vim.api.nvim_get_current_line()
-		local input = line:sub(prompt_len + 1)
+		local input = vim.api.nvim_get_current_line()
 		terminate()
 		on_confirm(input)
 	end, { buffer = buf })
