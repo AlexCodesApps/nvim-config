@@ -4,10 +4,10 @@ return {
   filetypes = {
     'javascript',
     'javascriptreact',
-    'javascript.jsx',
+    'jsx',
     'typescript',
     'typescriptreact',
-    'typescript.tsx',
+    'tsx',
   },
   root_markers = { 'tsconfig.json', 'jsconfig.json', 'package.json', '.git' },
 }

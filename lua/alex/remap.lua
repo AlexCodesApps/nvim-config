@@ -109,7 +109,6 @@ vim.keymap.set('n', '<leader>dw', function()
 end)
 vim.keymap.set('n', '<leader>da', vim.diagnostic.setqflist)
 
-
 vim.keymap.set('n', '<leader>fdr', function()
 	local rustdoc = require('alex.rustdoc')
 	local syms = rustdoc.get_docs()
