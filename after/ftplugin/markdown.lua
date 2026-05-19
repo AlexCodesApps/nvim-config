@@ -1,4 +1,6 @@
-vim.opt_local.spell = true
+-- if vim.fn.pumvisible() ~= 0 then
+	vim.opt_local.spell = true
+-- end
 vim.opt_local.wrap = true
 vim.opt_local.relativenumber = false
 vim.keymap.set('n', 'j', 'gj', { buffer = true })

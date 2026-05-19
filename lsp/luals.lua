@@ -13,16 +13,16 @@ return {
   -- defined by the server. For example the schema for lua-language-server
   -- can be found here https://raw.githubusercontent.com/LuaLS/vscode-lua/master/setting/schema.json
   settings = {
-    Lua = {
-      runtime = {
-        version = 'LuaJIT',
-      },
+	Lua = {
+	  runtime = {
+		version = 'LuaJIT',
+	  },
 	  diagnostics = {
 		  globals = { 'vim' }
 	  },
 	  workspace = {
-		  library = vim.api.nvim_get_runtime_file('', true)
+		  library = { "$VIMRUNTIME", "${3rd}/luv/library" }
 	  }
-    }
+	}
   }
 }

@@ -1,6 +1,19 @@
 vim.diagnostic.config { virtual_text = true }
 vim.lsp.log.set_level(vim.log.levels.OFF)
 
+vim.api.nvim_create_autocmd("LspAttach", {
+	callback = function(args)
+		local client = vim.lsp.get_client_by_id(args.data.client_id)
+		if client and client:supports_method("textDocument/completion") then
+			vim.lsp.completion.enable(true, client.id, args.buf, { autotrigger = true })
+			vim.api.nvim_create_autocmd('InsertLeave', {
+				buffer = 0,
+				callback = vim.snippet.stop
+			})
+		end
+	end,
+})
+
 vim.api.nvim_create_user_command('LspRestart', function ()
 	local lsps = vim.lsp.get_clients()
 	for _, lsp in ipairs(lsps) do

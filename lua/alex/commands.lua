@@ -4,6 +4,12 @@ local cswitch = require('alex.cswitch')
 
 vim.api.nvim_create_user_command('CSwitch', cswitch.cswitch, {})
 
+local repl = require('alex.repl')
+
+vim.api.nvim_create_user_command('InlineEval', function(opts)
+	repl.inline_eval(opts.line1, opts.line2)
+end, { range = true })
+
 vim.api.nvim_create_user_command('MkMdTable', function(opts)
 	local input = vim.api.nvim_buf_get_lines(0, opts.line1 - 1, opts.line2, true)
 	if #input < 2 then return end

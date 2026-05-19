@@ -129,9 +129,12 @@ end
 ---@param file string
 function M.open_file(file)
 	if os.getenv("TMUX") then
-		vim.fn.system({"tmux", "split-window", "lynx", "-vikeys", "--", file})
+		vim.system({"tmux", "split-window", "w3m", file})
 	else
-		vim.cmd("vert term lynx -vikeys -- " .. vim.fn.fnameescape(file))
+		vim.cmd("vertical")
+		vim.fn.jobstart({"w3m", file }, {
+			term = true
+		})
 	end
 end
 
