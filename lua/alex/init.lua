@@ -1,5 +1,5 @@
 require('alex.remap')
-require('alex.lazy')
+require('alex.pack')
 require('alex.lsp')
 require('alex.commands')
 require('alex.overrides')
