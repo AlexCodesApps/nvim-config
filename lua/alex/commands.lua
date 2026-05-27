@@ -3,6 +3,7 @@ require('alex.remap')
 local cswitch = require('alex.cswitch')
 
 vim.api.nvim_create_user_command('PackUpdate', function() vim.pack.update() end, {})
+vim.api.nvim_create_user_command('PackShow', function() vim.pack.update(nil, { offline = true }) end, {})
 
 vim.api.nvim_create_user_command('CSwitch', cswitch.cswitch, {})
 

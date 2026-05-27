@@ -1,3 +1,15 @@
+vim.lsp.config('*', {
+	capabilities = {
+		textDocument = {
+			completion = {
+				completionItem = {
+					snippetSupport = false
+				}
+			}
+		}
+	}
+})
+
 vim.diagnostic.config { virtual_text = true }
 vim.lsp.log.set_level(vim.log.levels.OFF)
 
@@ -5,11 +17,13 @@ vim.api.nvim_create_autocmd("LspAttach", {
 	callback = function(args)
 		local client = vim.lsp.get_client_by_id(args.data.client_id)
 		if client and client:supports_method("textDocument/completion") then
-			vim.lsp.completion.enable(true, client.id, args.buf, { autotrigger = true })
-			vim.api.nvim_create_autocmd('InsertLeave', {
-				buffer = 0,
-				callback = vim.snippet.stop
-			})
+			vim.o.complete = 'o'
+			vim.keymap.set('i', '<CR>', function()
+				if vim.fn.pumvisible() == 1 then
+					return '<C-e><CR>'
+				end
+				return '<CR>'
+			end, { expr = true })
 		end
 	end,
 })

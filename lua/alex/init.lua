@@ -18,6 +18,8 @@ if vim.g.neovide then
 	vim.g.neovide_cursor_animate_command_line = false
 end
 
+vim.o.pumborder = 'rounded'
+vim.o.pumblend = 5
 vim.o.splitright = true
 vim.o.tabstop = 4
 vim.o.shiftwidth = 4
