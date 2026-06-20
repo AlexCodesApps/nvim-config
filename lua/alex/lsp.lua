@@ -1,14 +1,24 @@
-vim.lsp.config('*', {
-	capabilities = {
-		textDocument = {
-			completion = {
-				completionItem = {
-					snippetSupport = false
+do
+	local function enable_snippets(enable)
+		return {
+			capabilities = {
+				textDocument = {
+					completion = {
+						completionItem = {
+							snippetSupport = enable
+						}
+					}
 				}
 			}
 		}
-	}
-})
+	end
+	vim.lsp.config('*', enable_snippets(false))
+	local enable = enable_snippets(true)
+	vim.lsp.config('ts_ls', enable)
+	vim.lsp.config('cssls', enable)
+	vim.lsp.config('html', enable)
+	vim.lsp.config('emmet_language_server', enable)
+end
 
 vim.diagnostic.config { virtual_text = true }
 vim.lsp.log.set_level(vim.log.levels.OFF)
@@ -16,6 +26,7 @@ vim.lsp.log.set_level(vim.log.levels.OFF)
 vim.api.nvim_create_autocmd("LspAttach", {
 	callback = function(args)
 		local client = vim.lsp.get_client_by_id(args.data.client_id)
+		assert (client)
 		if client and client:supports_method("textDocument/completion") then
 			vim.o.complete = 'o'
 			vim.keymap.set('i', '<CR>', function()
@@ -25,23 +36,33 @@ vim.api.nvim_create_autocmd("LspAttach", {
 				return '<CR>'
 			end, { expr = true })
 		end
+		if vim.bo.filetype == 'html'
+			and client:supports_method('textDocument/linkedEditingRange', 0) then
+			vim.lsp.linked_editing_range.enable(true, {
+				client_id = client.id
+			})
+		end
 	end,
 })
 
-vim.api.nvim_create_user_command('LspRestart', function ()
-	local lsps = vim.lsp.get_clients()
-	for _, lsp in ipairs(lsps) do
-		local name = lsp.name
-		vim.lsp.enable(name, false)
-		vim.lsp.enable(name, true)
-		vim.notify("Restarted client [" .. name .. "]")
-	end
-end, { desc = "restarts all running language servers" })
+vim.api.nvim_create_autocmd('LspProgress', {
+	callback = function(ev)
+		local value = ev.data.params.value
+		vim.api.nvim_echo({ { value.message or 'done' } }, false, {
+			id = 'lsp.' .. ev.data.params.token,
+			kind = 'progress',
+			source = 'vim.lsp',
+			title = value.title,
+			status = value.kind ~= 'end' and 'running' or 'success',
+			percent = value.percentage,
+		})
+	end,
+})
 
 vim.lsp.enable('luals')
 vim.lsp.enable('ts_ls')
-vim.lsp.enable('vscode_css_lsp')
-vim.lsp.enable('vscode_html_lsp')
+vim.lsp.enable('cssls')
+vim.lsp.enable('html')
 vim.lsp.enable('clangd')
 vim.lsp.enable('emmet_language_server')
 vim.lsp.enable('rust-analyzer')

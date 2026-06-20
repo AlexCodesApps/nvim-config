@@ -50,4 +50,12 @@ require('alex.cswitch').add_extension_pairs({
 	{ 'ts', 'html' },
 })
 
+vim.api.nvim_create_autocmd('TextYankPost', {
+	callback = function()
+		vim.hl.on_yank {
+			timeout = 100
+		}
+	end
+})
+
 require('alex.projconf')

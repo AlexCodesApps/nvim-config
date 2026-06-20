@@ -99,12 +99,12 @@ vim.keymap.set('n', '<leader>ft', ffind.find_colorscheme)
 
 vim.keymap.set('n', '<leader>de', function()
 	vim.diagnostic.setqflist {
-		severity = 'ERROR',
+		severity = vim.diagnostic.severity.ERROR,
 	}
 end)
 vim.keymap.set('n', '<leader>dw', function()
 	vim.diagnostic.setqflist {
-		severity = 'WARN',
+		severity = vim.diagnostic.severity.WARN,
 	}
 end)
 vim.keymap.set('n', '<leader>da', vim.diagnostic.setqflist)
