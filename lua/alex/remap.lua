@@ -15,6 +15,7 @@ vim.keymap.set({'n', 'x'}, '<leader>p', '"+p')
 vim.keymap.set({'n', 'x'}, '<leader>P', '"+P')
 vim.keymap.set('c', '<C-a>', '<Home>')
 vim.keymap.set('c', '<C-e>', '<End>')
+vim.keymap.set('n', '<leader>s', ':%y +<CR>')
 vim.keymap.set({'n', 'x'}, '<S-Tab>', function()
 	if vim.w.focused_window then
 		local winid = vim.w.focused_window
@@ -34,13 +35,38 @@ vim.keymap.set({'n', 'x'}, '<S-Tab>', function()
 	vim.w.focused_window = winid
 end)
 
-for i=0,9 do
-	vim.keymap.set('n', ('<M-%d>'):format(i), ('%dgt'):format(i))
+---@param input string
+---@return string
+local function format_html_tag(input)
+	local self_closing = {
+		area = true,
+		base = true,
+		br = true,
+		col = true,
+		embed = true,
+		hr = true,
+		img = true,
+		input = true,
+		link = true,
+		meta = true,
+		param = true,
+		source = true,
+		track = true,
+		wbr = true,
+		command = true,
+		keygen = true,
+		menuitem = true,
+		frame = true,
+	}
+	if self_closing[input] then
+		return ('<%s>'):format(input)
+	end
+	return ('<%s></%s>'):format(input, input)
 end
 
 ---@param input string
 local function insert_html_tag(input)
-	local output = ('<%s></%s>'):format(input, input)
+	local output = format_html_tag(input)
 	vim.api.nvim_paste(output, false, -1)
 	vim.cmd('norm ' .. tostring(#input + 3) .. 'h')
 end
