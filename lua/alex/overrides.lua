@@ -77,11 +77,12 @@ vim.ui.input = function(opts, on_confirm)
 	local augroup = vim.api.nvim_create_augroup('AlexOverrideInput', {
 		clear = true,
 	})
-	terminate = function()
+	terminate = function(input)
 		vim.api.nvim_del_augroup_by_id(augroup)
 		vim.api.nvim_buf_delete(buf, { force = true })
 		vim.cmd.stopinsert()
 		terminate = nil
+		on_confirm(input or opts.cancelreturn)
 	end
 	local ns = vim.api.nvim_create_namespace('AlexOverrideInput')
 	vim.api.nvim_buf_set_lines(buf, 0, -1, false, { default })
@@ -103,8 +104,7 @@ vim.ui.input = function(opts, on_confirm)
 	})
 	vim.keymap.set({ 'i', 'n' }, '<Enter>', function()
 		local input = vim.api.nvim_get_current_line()
-		terminate()
-		on_confirm(input)
+		terminate(input)
 	end, { buffer = buf })
 	vim.keymap.set('n', '<Esc>', terminate, { buffer = buf })
 	vim.cmd('startinsert!')

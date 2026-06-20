@@ -499,6 +499,10 @@ function M.default_sorter(entries, input, callback)
 	end)
 end
 
+local function escape_bufname(bufname)
+	return '^' .. vim.fn.escape(bufname, '\\.*?~,^${}[]') .. '$'
+end
+
 ---@param winmode alex.ffind.WinMode
 ---@param path string
 local function edit_file(winmode, path)
@@ -507,8 +511,10 @@ local function edit_file(winmode, path)
 		hsplit = "new ",
 		vsplit = "vnew ",
 	}
-	if vim.api.nvim_get_current_buf() ~= vim.fn.bufnr(path) then
-		vim.cmd(table[winmode] .. vim.fn.fnameescape(path))
+	local rpath = vim.uv.fs_realpath(path)
+	assert (rpath)
+	if vim.api.nvim_get_current_buf() ~= vim.fn.bufnr(escape_bufname(rpath)) then
+		vim.cmd(table[winmode] .. vim.fn.fnameescape(rpath))
 	end
 end
 
@@ -762,6 +768,7 @@ local function open_picker_qf_symbol_list(list)
 		"Struct",
 	}
 	for _, item in ipairs(items) do
+---@diagnostic disable-next-line: undefined-field
 		if vim.tbl_contains(white_list, item.kind) then
 			local entry = M.picker_entry.new(item.text, item)
 			table.insert(entries, entry)
