@@ -40,6 +40,7 @@ end
 ---@field highlight? function
 
 local terminate = nil
+AlexOverridesCompletion = nil
 
 ---@param opts alex.overrides.InputOpts
 ---@param on_confirm function
@@ -60,8 +61,7 @@ vim.ui.input = function(opts, on_confirm)
 	}
 	local prompt = opts.prompt or ""
 	local default = opts.default or ""
-	-- local completion = opts.completion -- TODO: should do something
-	-- local hightlight = opts.highlight
+	-- local hightlight = opts.highlight -- TODO: should do something
 	local buf = vim.api.nvim_create_buf(false, true)
 	local win = vim.api.nvim_open_win(buf, true, {
 		relative = 'laststatus',
@@ -82,7 +82,26 @@ vim.ui.input = function(opts, on_confirm)
 		vim.api.nvim_buf_delete(buf, { force = true })
 		vim.cmd.stopinsert()
 		terminate = nil
+		AlexOverridesCompletion = nil
 		on_confirm(input or opts.cancelreturn)
+	end
+	if opts.completion then
+		---@param findstart 0 | 1
+		---@param base string?
+		AlexOverridesCompletion = function (findstart, base)
+			if findstart == 1 then
+				local col = vim.api.nvim_win_get_cursor(0)[2]
+				local line = vim.api.nvim_get_current_line()
+				line = line:sub(1, col)
+				local roff = line:reverse():find('%s', 1, false)
+				local off = (roff and line:len() - roff + 1) or 0
+				return off
+			else
+				assert (base)
+				return vim.fn.getcompletion(base, opts.completion, true)
+			end
+		end
+		vim.bo.omnifunc = 'v:lua.AlexOverridesCompletion'
 	end
 	local ns = vim.api.nvim_create_namespace('AlexOverrideInput')
 	vim.api.nvim_buf_set_lines(buf, 0, -1, false, { default })
