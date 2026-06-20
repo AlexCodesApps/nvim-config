@@ -22,8 +22,10 @@ return {
 		palette_overrides = {},
 		overrides = {
 			Pmenu = { link = 'Normal' },
+			PmenuSbar = { link = 'Cursor' },
+			PmenuThumb = { bg = 'white' },
 			StatusLine = { link = 'Normal' },
-			StatusLineNC = { link = 'Normal' },
+			StatusLineNC = { link = 'NonText' },
 			StatusLineTerm = { link = 'Normal' },
 			LspReferenceTarget = {},
 			['@lsp.type.class'] = { link = '@lsp.type.variable' },
