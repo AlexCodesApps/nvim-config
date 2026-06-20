@@ -23,11 +23,12 @@ end
 vim.diagnostic.config { virtual_text = true }
 vim.lsp.log.set_level(vim.log.levels.OFF)
 
-vim.api.nvim_create_autocmd("LspAttach", {
+vim.api.nvim_create_autocmd('LspAttach', {
 	callback = function(args)
 		local client = vim.lsp.get_client_by_id(args.data.client_id)
 		assert (client)
-		if client and client:supports_method("textDocument/completion") then
+		vim.notify('LspAttach ' .. client.name)
+		if client and client:supports_method('textDocument/completion') then
 			vim.o.complete = 'o'
 			vim.keymap.set('i', '<CR>', function()
 				if vim.fn.pumvisible() == 1 then
