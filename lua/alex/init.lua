@@ -5,7 +5,7 @@ require('alex.commands')
 require('alex.overrides')
 
 vim.o.background = 'dark'
-vim.cmd.colorscheme('github_dark_default')
+vim.cmd.colorscheme('gruvbox')
 vim.g.loaded_perl_provider = 0
 vim.g.loaded_node_provider = 0
 vim.g.loaded_ruby_provider = 0
@@ -19,6 +19,7 @@ if vim.g.neovide then
 end
 
 vim.o.pumborder = 'rounded'
+vim.o.winborder = 'rounded'
 vim.o.pumblend = 5
 vim.o.splitright = true
 vim.o.tabstop = 4
@@ -37,7 +38,7 @@ vim.g.netrw_banner = 0
 vim.g.ffind_gitignore = 1
 vim.o.completeopt = 'menuone,noinsert,fuzzy'
 vim.o.indentexpr = 'nvim_treesitter#indent()'
-vim.o.showtabline = 0
+vim.o.showtabline = 1
 vim.o.shortmess = vim.o.shortmess .. 'I'
 
 vim.cmd.packadd("cfilter")
