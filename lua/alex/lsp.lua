@@ -23,11 +23,16 @@ end
 vim.diagnostic.config { virtual_text = true }
 vim.lsp.log.set_level(vim.log.levels.OFF)
 
+local seen_clients = {}
+
 vim.api.nvim_create_autocmd('LspAttach', {
 	callback = function(args)
 		local client = vim.lsp.get_client_by_id(args.data.client_id)
 		assert (client)
-		vim.notify('LspAttach ' .. client.name)
+		if not seen_clients[client.id] then
+			vim.notify('LspAttach ' .. client.name)
+			seen_clients[client.id] = true
+		end
 		if client and client:supports_method('textDocument/completion') then
 			vim.o.complete = 'o'
 			vim.keymap.set('i', '<CR>', function()
@@ -58,6 +63,14 @@ vim.api.nvim_create_autocmd('LspProgress', {
 			percent = value.percentage,
 		})
 	end,
+})
+
+vim.lsp.config('gopls', {
+	settings = {
+		gopls = {
+			semanticTokens = false
+		}
+	}
 })
 
 vim.lsp.enable('luals')
