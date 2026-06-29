@@ -71,7 +71,7 @@ local function insert_html_tag(input)
 	vim.cmd('norm ' .. tostring(#input + 3) .. 'h')
 end
 
-vim.keymap.set({'n'}, '<leader>t', function()
+vim.keymap.set('n', '<leader>t', function()
 	local function on_input(input)
 		if not input or input == '' then return end
 		insert_html_tag(input)

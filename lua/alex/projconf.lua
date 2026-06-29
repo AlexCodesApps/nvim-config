@@ -123,6 +123,7 @@ local function setup()
 				return entry:match(pattern)
 			end, entries)
 		end,
+		desc = 'Run projconf utility'
 	})
 	if not os.getenv('PROJCONF_SUPPRESS') then
 		load_config()

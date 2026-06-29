@@ -58,6 +58,10 @@ function M.cswitch()
 		vim.cmd('e ' .. vim.fn.fnameescape(file))
 	end
 	local path = vim.api.nvim_buf_get_name(0)
+	if path == "" then
+		vim.notify('CSwitch needs named buffers')
+		return
+	end
 	path = realpath(path)
 	if filepairs[path] ~= nil then
 		on_select(filepairs[path])

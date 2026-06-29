@@ -6,7 +6,6 @@ local uv = vim.uv or vim.loop
 
 function M.home_dir()
 	if not state.home then
----@diagnostic disable-next-line: undefined-field
 		state.home = uv.os_homedir()
 	end
 	return state.home

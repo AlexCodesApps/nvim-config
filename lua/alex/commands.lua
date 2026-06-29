@@ -2,16 +2,22 @@ require('alex.remap')
 
 local cswitch = require('alex.cswitch')
 
-vim.api.nvim_create_user_command('PackUpdate', function() vim.pack.update() end, {})
-vim.api.nvim_create_user_command('PackShow', function() vim.pack.update(nil, { offline = true }) end, {})
+vim.api.nvim_create_user_command('PackUpdate', function() vim.pack.update() end, {
+	desc = 'Update installed vim.pack packages'
+})
+vim.api.nvim_create_user_command('PackShow', function() vim.pack.update(nil, { offline = true }) end, {
+	desc = 'Show installed vim.pack packages'
+})
 
-vim.api.nvim_create_user_command('CSwitch', cswitch.cswitch, {})
+vim.api.nvim_create_user_command('CSwitch', cswitch.cswitch, {
+	desc = 'Switch between file pairs via cswitch'
+})
 
 local repl = require('alex.repl')
 
 vim.api.nvim_create_user_command('InlineEval', function(opts)
 	repl.inline_eval(opts.line1, opts.line2)
-end, { range = true })
+end, { range = true, desc = 'Evaluate range with filetype specific interpreter' })
 
 vim.api.nvim_create_user_command('MkMdTable', function(opts)
 	local input = vim.api.nvim_buf_get_lines(0, opts.line1 - 1, opts.line2, true)
@@ -107,9 +113,9 @@ end, { desc = 'Focus.' })
 local swap_files_open_cmd = 'Explore ' .. vim.fn.stdpath('state') .. '/swap'
 vim.api.nvim_create_user_command('SwapFilesOpen', function()
 	vim.cmd(swap_files_open_cmd)
-end, {})
+end, { desc = 'Open swap file directory' })
 
 vim.api.nvim_create_user_command('WrappedScroll', function()
 	vim.keymap.set('n', 'j', 'gj', { buffer = true })
 	vim.keymap.set('n', 'k', 'gk', { buffer = true })
-end, {})
+end, { desc = 'Enable wrapped scrolling' })

@@ -39,7 +39,7 @@ vim.g.netrw_altfile = 1
 vim.g.ffind_gitignore = 1
 vim.o.completeopt = 'menuone,noinsert,fuzzy'
 vim.o.wildoptions = 'pum,tagfile,fuzzy'
-vim.o.wildmode = 'noselect:lastused,full'
+vim.o.wildmode = 'list:longest,full'
 vim.o.indentexpr = 'nvim_treesitter#indent()'
 vim.o.showtabline = 1
 vim.o.shortmess = vim.o.shortmess .. 'I'
@@ -61,5 +61,7 @@ vim.api.nvim_create_autocmd('TextYankPost', {
 		}
 	end
 })
+
+vim.api.nvim_create_autocmd('Progress', { command = 'redrawstatus' })
 
 require('alex.projconf')

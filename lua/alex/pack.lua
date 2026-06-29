@@ -14,7 +14,11 @@ for name, ty in vim.fs.dir(plugins_path) do
 			if key == 1 then
 				spec.src = 'https://www.github.com/' .. value
 			elseif key == 'version' then
-				spec.version = value
+				if type(value) == 'string' then
+					spec.version = vim.version.range(value)
+				else
+					spec.version = value
+				end
 			elseif key == 'name' then
 				spec.name = value
 			else
@@ -32,10 +36,12 @@ local prio = {}
 local norm = {}
 
 for _, pack in ipairs(vim.pack.get()) do
-	if pack.spec.data.priority then
-		prio[#prio+1] = pack
-	else
-		norm[#norm+1] = pack
+	if pack.active then
+		if pack.spec.data.priority then
+			prio[#prio+1] = pack
+		else
+			norm[#norm+1] = pack
+		end
 	end
 end
 
