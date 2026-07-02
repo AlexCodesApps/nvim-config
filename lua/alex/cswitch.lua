@@ -14,13 +14,13 @@ end
 ---@param path string
 ---@return string
 local function realpath(path)
----@diagnostic disable-next-line: undefined-field
-	return (vim.uv or vim.loop).fs_realpath(path)
+	local path2 = (vim.uv or vim.loop).fs_realpath(path)
+	assert (path2)
+	return path2
 end
 
 function M.block_file(path)
 	path = realpath(path)
-	assert(path)
 	table.insert(blacklist, path)
 end
 

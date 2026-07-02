@@ -101,7 +101,6 @@ function M.get_docs(root, update)
 		vim.notify("Couldn't find project root")
 		return nil
 	end
----@diagnostic disable-next-line: undefined-field
 	root = (vim.uv or vim.loop).fs_realpath(root)
 	assert(root)
 	if cache[root] then

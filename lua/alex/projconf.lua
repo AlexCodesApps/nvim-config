@@ -1,6 +1,5 @@
 local M = {}
 
----@diagnostic disable-next-line: undefined-field
 local fs_stat = (vim.uv or vim.loop).fs_stat
 
 ---@param path string
