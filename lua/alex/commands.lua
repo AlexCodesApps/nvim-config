@@ -119,3 +119,23 @@ vim.api.nvim_create_user_command('WrappedScroll', function()
 	vim.keymap.set('n', 'j', 'gj', { buffer = true })
 	vim.keymap.set('n', 'k', 'gk', { buffer = true })
 end, { desc = 'Enable wrapped scrolling' })
+
+vim.api.nvim_create_user_command('FzGrep', function(opt)
+	local cwd = opt.args ~= ''
+		and opt.args or vim.api.nvim_buf_get_name(0)
+	local stats = vim.uv.fs_stat(cwd)
+	if not stats then
+		vim.notify('argument does not exist')
+		return
+	end
+	if stats.type ~= 'directory' then
+		cwd = vim.fs.dirname(cwd)
+	end
+	vim.schedule(function()
+		require('alex.ffind').grep_files {
+			cwd = cwd,
+			exclude_pattern = vim.g.ffind_exclude_pattern,
+			gitignore = vim.g.ffind_gitignore == 1
+		}
+	end)
+end, { desc = 'Fuzzy grep directory', nargs = '?', complete = 'file' })

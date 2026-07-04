@@ -40,7 +40,7 @@ vim.api.nvim_create_autocmd('LspAttach', {
 					return '<C-e><CR>'
 				end
 				return '<CR>'
-			end, { expr = true })
+			end, { expr = true, buf = args.buf })
 		end
 		if vim.bo.filetype == 'html'
 			and client:supports_method('textDocument/linkedEditingRange', 0) then

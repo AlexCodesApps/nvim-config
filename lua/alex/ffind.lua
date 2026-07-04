@@ -146,6 +146,8 @@ end
 local function terminate_picker(selected)
 	if not g_picker then return end
 	vim.api.nvim_del_augroup_by_id(g_picker.augroup)
+	vim.api.nvim_win_close(g_picker.inner.win, true)
+	vim.api.nvim_win_close(g_picker.outer.win, true)
 	vim.api.nvim_buf_delete(g_picker.inner.buf, {
 		force = true
 	})
@@ -499,22 +501,37 @@ function M.default_sorter(entries, input, callback)
 	end)
 end
 
-local function escape_bufname(bufname)
-	return '^' .. vim.fn.escape(bufname, '\\.*?~,^${}[]') .. '$'
-end
+---@class alex.ffind.EditFileOptions
+---@field cwd? string
+---@field cursor? [integer, integer]
 
 ---@param winmode alex.ffind.WinMode
 ---@param path string
-local function edit_file(winmode, path)
-	local table = {
-		split = "e ",
-		hsplit = "new ",
-		vsplit = "vnew ",
+---@param opts? alex.ffind.EditFileOptions
+local function edit_file(winmode, path, opts)
+	opts = opts or {}
+	local cwd = opts.cwd
+	local splits = {
+		split = "edit",
+		hsplit = "new",
+		vsplit = "vnew",
 	}
+	if cwd and path:sub(1, 1) ~= "/" then
+		path = vim.fs.joinpath(cwd, path)
+	end
 	local rpath = vim.uv.fs_realpath(path)
 	assert (rpath)
-	if vim.api.nvim_get_current_buf() ~= vim.fn.bufnr(escape_bufname(rpath)) then
-		vim.cmd(table[winmode] .. vim.fn.fnameescape(rpath))
+	if winmode == 'split' then
+		local bufpath =
+			vim.uv.fs_realpath(vim.api.nvim_buf_get_name(0))
+		if bufpath == rpath then
+			goto fin
+		end
+	end
+	vim.cmd[splits[winmode]](rpath)
+::fin::
+	if opts.cursor then
+		vim.api.nvim_win_set_cursor(0, opts.cursor)
 	end
 end
 
@@ -618,9 +635,14 @@ function M.grep_files(config)
 	local function on_select(entry, winmode)
 		if not entry then return end
 		local file = entry.data.file
-		edit_file(winmode, file)
-		local row = entry.data.row
-		vim.api.nvim_win_set_cursor(0, { row, 0 })
+		local cursor = {
+			entry.data.row,
+			0
+		}
+		edit_file(winmode, file, {
+			cwd = cwd,
+			cursor = cursor,
+		})
 	end
 	---@param entries alex.ffind.PickerEntry[]
 	local function to_qflist(entries)
@@ -777,15 +799,9 @@ local function open_picker_qf_symbol_list(list)
 	local function on_select(entry, winmode)
 		if not entry then return end
 		local item = entry.data ---@type alex.ffind.QfSymbolEntry
-		if item.filename ~= vim.api.nvim_buf_get_name(0) or winmode ~= "split" then
-			local table = {
-				split = "edit ",
-				hsplit = "new ",
-				vsplit = "vnew ",
-			}
-			vim.cmd(table[winmode] .. item.filename)
-		end
-		vim.api.nvim_win_set_cursor(0, { item.lnum, item.col - 1 })
+		edit_file(winmode, item.filename, {
+			cursor = { item.lnum, item.col - 1 },
+		})
 	end
 	---@param entries_ alex.ffind.PickerEntry[]
 	local function to_qflist(entries_)
