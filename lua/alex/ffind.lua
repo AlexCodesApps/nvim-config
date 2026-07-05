@@ -508,6 +508,7 @@ end
 ---@param winmode alex.ffind.WinMode
 ---@param path string
 ---@param opts? alex.ffind.EditFileOptions
+---@return boolean
 local function edit_file(winmode, path, opts)
 	opts = opts or {}
 	local cwd = opts.cwd
@@ -521,18 +522,20 @@ local function edit_file(winmode, path, opts)
 	end
 	local rpath = vim.uv.fs_realpath(path)
 	assert (rpath)
-	if winmode == 'split' then
+	local ok = true
+	if winmode == "split" then
 		local bufpath =
 			vim.uv.fs_realpath(vim.api.nvim_buf_get_name(0))
 		if bufpath == rpath then
 			goto fin
 		end
 	end
-	vim.cmd[splits[winmode]](rpath)
+	ok = pcall(vim.cmd[splits[winmode]], rpath)
 ::fin::
 	if opts.cursor then
 		vim.api.nvim_win_set_cursor(0, opts.cursor)
 	end
+	return ok
 end
 
 ---@class alex.ffind.FindFileConfig
