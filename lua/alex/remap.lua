@@ -144,12 +144,7 @@ vim.keymap.set('n', '<leader>fdr', function()
 	end, syms)
 	ffind.open_picker(entries, {
 		actions = {
-			on_select = function(entry, winmode)
-				if winmode == 'vsplit' then
-					vim.cmd('vnew')
-				elseif winmode == 'hsplit' then
-					vim.cmd('new')
-				end
+			on_select = function(entry, _)
 				rustdoc.open_file(entry.data.file)
 			end
 		}

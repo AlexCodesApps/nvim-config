@@ -131,11 +131,9 @@ vim.api.nvim_create_user_command('FzGrep', function(opt)
 	if stats.type ~= 'directory' then
 		cwd = vim.fs.dirname(cwd)
 	end
-	vim.schedule(function()
-		require('alex.ffind').grep_files {
-			cwd = cwd,
-			exclude_pattern = vim.g.ffind_exclude_pattern,
-			gitignore = vim.g.ffind_gitignore == 1
-		}
-	end)
+	require('alex.ffind').grep_files {
+		cwd = cwd,
+		exclude_pattern = vim.g.ffind_exclude_pattern,
+		gitignore = vim.g.ffind_gitignore == 1
+	}
 end, { desc = 'Fuzzy grep directory', nargs = '?', complete = 'file' })
