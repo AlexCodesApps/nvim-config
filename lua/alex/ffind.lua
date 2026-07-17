@@ -353,7 +353,6 @@ function M.open_picker(entries, config)
 		row = math.floor(vim.o.lines * 0.15),
 		col = math.floor(vim.o.columns * 0.15),
 	})
-	vim.wo[outer_window].winhl = 'Normal:Normal,FloatBorder:Normal'
 	local inner_window = vim.api.nvim_open_win(inner_winbuf, true, {
 		relative = "win",
 		win = outer_window,
@@ -364,7 +363,11 @@ function M.open_picker(entries, config)
 		row = vim.api.nvim_win_get_height(outer_window) + 1,
 		col = -1,
 	})
-	vim.wo[inner_window].winhl = 'Normal:Normal,FloatBorder:Normal'
+	if vim.g.ffind_suppress_float_hl == 1 then
+		local hl = 'Normal:Normal,FloatBorder:Normal,FloatTitle:Normal'
+		vim.wo[outer_window].winhl = hl
+		vim.wo[inner_window].winhl = hl
+	end
 	local augroup = vim.api.nvim_create_augroup("alex.ffind", {
 		clear = true
 	})
