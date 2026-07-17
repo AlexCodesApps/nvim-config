@@ -1,5 +1,9 @@
+-- no thank you
+vim.g.loaded_nvim_net_plugin = true
+
 require('alex.remap')
 require('alex.pack')
+require('alex.remap')
 require('alex.lsp')
 require('alex.commands')
 require('alex.overrides')

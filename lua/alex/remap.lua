@@ -64,32 +64,21 @@ local function format_html_tag(input)
 	return ('<%s></%s>'):format(input, input)
 end
 
----@param input string
-local function insert_html_tag(input)
-	local output = format_html_tag(input)
-	vim.api.nvim_paste(output, false, -1)
-	vim.cmd('norm ' .. tostring(#input + 3) .. 'h')
+local function insert_html_tag()
+	local function on_input(input)
+		if not input or input == '' then return end
+		local output = format_html_tag(input)
+		vim.api.nvim_paste(output, false, -1)
+		vim.cmd('norm ' .. tostring(#input + 3) .. 'h')
+	end
+	vim.ui.input({
+		prompt = 'Enter the HTML tag: ',
+	}, on_input)
 end
 
-vim.keymap.set('n', '<leader>t', function()
-	local function on_input(input)
-		if not input or input == '' then return end
-		insert_html_tag(input)
-	end
-	vim.ui.input({
-		prompt = 'Enter the HTML tag: ',
-	}, on_input)
-end)
+vim.keymap.set('n', '<leader>t', insert_html_tag)
 
-vim.keymap.set('i', '<C-t>', function()
-	local function on_input(input)
-		if not input or input == '' then return end
-		insert_html_tag(input)
-	end
-	vim.ui.input({
-		prompt = 'Enter the HTML tag: ',
-	}, on_input)
-end)
+vim.keymap.set('i', '<C-t>', insert_html_tag)
 
 local ffind = require('alex.ffind')
 vim.keymap.set('n', '<leader>ff', function()
