@@ -137,14 +137,14 @@ end
 
 ---@return alex.api.Queue
 local function scheme_queue()
-	return repl_queue {'scheme', scheme_repl_path}
+	return repl_queue {'scheme', '--script', scheme_repl_path}
 end
 
 local ft_table = {
 	vim = vim_queue,
 	lua = lua_queue,
 	python = python_queue,
-	-- scheme = scheme_queue,
+	scheme = scheme_queue,
 }
 
 local ns = vim.api.nvim_create_namespace('InlineEvalText')
