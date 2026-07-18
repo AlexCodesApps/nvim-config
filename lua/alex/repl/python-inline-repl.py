@@ -1,6 +1,7 @@
 import sys
 import io
 import ast
+import code
 from contextlib import redirect_stdout, redirect_stderr
 
 def eprint(*kwargs):
@@ -11,6 +12,8 @@ def send_response(payload: bytes):
     sys.stdout.buffer.write(header)
     sys.stdout.buffer.write(payload)
     sys.stdout.buffer.flush()
+
+interpreter = code.InteractiveInterpreter()
 
 while True:
     payload_len_bytes = sys.stdin.buffer.read(8)
@@ -39,7 +42,7 @@ while True:
                     tree.body[-1] = ast.Expr(expr)
                     ast.fix_missing_locations(tree)
                 code = compile(tree, '<repl>', 'exec')
-                exec(code)
+                interpreter.runcode(code)
         except Exception as err:
             eprint(str(err))
         output = buf.getvalue()

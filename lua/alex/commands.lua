@@ -13,10 +13,10 @@ vim.api.nvim_create_user_command('CSwitch', cswitch.cswitch, {
 	desc = 'Switch between file pairs via cswitch'
 })
 
-local repl = require('alex.repl')
+local inline_repl = require('alex.repl.inline')
 
 vim.api.nvim_create_user_command('InlineEval', function(opts)
-	repl.inline_eval(opts.line1, opts.line2)
+	inline_repl.inline_eval(opts.line1, opts.line2)
 end, { range = true, desc = 'Evaluate range with filetype specific interpreter' })
 
 vim.api.nvim_create_user_command('MkMdTable', function(opts)

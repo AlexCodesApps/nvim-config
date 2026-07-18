@@ -126,9 +126,9 @@ local function lua_queue()
 end
 
 local python_repl_path =
-	vim.fn.stdpath('config') .. '/lua/alex/repl/python_repl.py'
+	vim.fn.stdpath('config') .. '/lua/alex/repl/python-inline-repl.py'
 local scheme_repl_path =
-	vim.fn.stdpath('config') .. '/lua/alex/repl/scheme_repl.scm'
+	vim.fn.stdpath('config') .. '/lua/alex/repl/scheme-inline-repl.scm'
 
 ---@return alex.api.Queue
 local function python_queue()
