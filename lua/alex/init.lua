@@ -44,14 +44,13 @@ vim.g.ffind_gitignore = 1
 vim.o.completeopt = 'menuone,noinsert,fuzzy'
 vim.o.wildoptions = 'pum,tagfile,fuzzy'
 vim.o.wildmode = 'list:longest,full'
-vim.o.indentexpr = 'nvim_treesitter#indent()'
 vim.o.showtabline = 1
 vim.o.shortmess = vim.o.shortmess .. 'I'
 
 do
 	local ok, devicons = pcall(require, 'nvim-web-devicons')
 	if ok then
-		function StatusLineIcon()
+		function _G.StatusLineIcon()
 			if vim.api.nvim_get_current_win() ~= tonumber(vim.g.actual_curwin) then
 				return ''
 			end
@@ -69,7 +68,7 @@ do
 	end
 end
 
-vim.cmd.packadd("cfilter")
+vim.cmd.packadd('cfilter')
 
 require('alex.cswitch').add_extension_pairs({
 	{ 'c', 'h', },
