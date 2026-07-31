@@ -82,4 +82,110 @@ function M.try_enable_clang_format(bufnr)
 	end
 end
 
+---@alias alex.api.RangeType 'char'|'line'|'block'
+
+---@alias alex.api.CompletionType 'ctrl_x' | 'generic'
+
+---@class alex.api.VisualModeInfo
+---@field major 'x'
+---@field range alex.api.RangeType
+
+---@class alex.api.NormalModeInfo
+---@field major 'n'
+---@field pending boolean
+---@field range? alex.api.RangeType
+---@field term boolean
+
+---@class alex.api.SelectModeInfo
+---@field major 's'
+---@field range alex.api.RangeType
+---@field ctrl_o boolean
+
+---@class alex.api.InsertModeInfo
+---@field major 'i'
+---@field completion? alex.api.CompletionType
+---@field ctrl_o boolean
+
+---@class alex.api.ReplaceModeInfo
+---@field major 'R'
+---@field virtual boolean
+---@field completion? alex.api.CompletionType
+---@field ctrl_o boolean
+
+---@class alex.api.CommandLineMode
+---@field major 'c'
+---@field overstrike boolean
+---@field ex boolean
+
+---@class alex.api.HitEnterPromptMode
+---@field major 'r'
+---@field prompt_type 'norm'|'more'|'query'
+
+---@class alex.api.ShellMode
+---@field major '!'
+
+---@class alex.api.TerminalMode
+---@field major 't'
+---@field ctrl_o boolean
+
+---@alias alex.api.ModeInfo alex.api.VisualModeInfo
+--- 						| alex.api.NormalModeInfo
+--- 						| alex.api.SelectModeInfo
+--- 						| alex.api.InsertModeInfo
+--- 						| alex.api.ReplaceModeInfo
+--- 						| alex.api.CommandLineMode
+--- 						| alex.api.HitEnterPromptMode
+--- 						| alex.api.ShellMode
+--- 						| alex.api.TerminalMode
+
+---@return alex.api.ModeInfo
+function M.mode_info()
+	---@type table<string, alex.api.ModeInfo>
+	local tbl = {
+		n = { major = 'n', pending = false, term = false },
+		no = { major = 'n', pending = true, term = false },
+		nov = { major = 'n', pending = true, range = 'char', term = false },
+		noV = { major = 'n', pending = true, range = 'line', term = false },
+		['no\22'] = { major = 'n', pending = true, range = 'block', term = false },
+		niI = { major = 'i', ctrl_o = true },
+		niR = { major = 'R', virtual = false, ctrl_o = true },
+		niV = { major = 'R', virtual = true, ctrl_o = true },
+		nt = { major = 'n', pending = false, term = true },
+		ntT = { major = 't', ctrl_o = true },
+		v = { major = 'x', range = 'char' },
+		vs = { major = 's', range = 'char', ctrl_o = true },
+		V = { major = 'x', range = 'line' },
+		Vs = { major = 's', range = 'line', ctrl_o = true },
+		['\22'] = { major = 'x', range = 'block' },
+		['\22s'] = { major = 's', range = 'block', ctrl_o = true },
+		s = { major = 's', range = 'char', ctrl_o = false },
+		S = { major = 's', range = 'line', ctrl_o = false },
+		['\19'] = { major = 's', range = 'block', ctrl_o = false },
+		i = { major = 'i', ctrl_o = false },
+		ic = { major = 'i', completion = 'generic', ctrl_o = false },
+		ix = { major = 'i', completion = 'ctrl_x', ctrl_o = false },
+		R = { major = 'R', virtual = false, ctrl_o = false },
+		Rc = { major = 'R', virtual = false, completion = 'generic', ctrl_o = false },
+		Rx = { major = 'R', virtual = false, completion = 'ctrl_x', ctrl_o = false },
+		Rv = { major = 'R', virtual = true, ctrl_o = false },
+		Rvc = { major = 'R', virtual = true, completion = 'generic', ctrl_o = false },
+		Rvx = { major = 'R', virtual = true, completion = 'ctrl_x', ctrl_o = false },
+		c = { major = 'c', overstrike = false, ex = false },
+		cr = { major = 'c', overstrike = true, ex = false },
+		cv = { major = 'c', overstrike = false, ex = true },
+		cvr = { major = 'c', overstrike = true, ex = true },
+		r = { major = 'r', prompt_type = 'norm' },
+		rm = { major = 'r', prompt_type = 'more' },
+		['r?'] = { major = 'r', prompt_type = 'query' },
+		['!'] = { major = '!' },
+		t = { major = 't', ctrl_o = false },
+	}
+	return tbl[vim.fn.mode(1)] or error('update')
+end
+
+---@param mode alex.api.ModeInfo
+function M.mode_info_is_visual(mode)
+	return mode.major == 'x'
+end
+
 return M
