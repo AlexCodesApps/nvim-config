@@ -22,6 +22,12 @@ vim.api.nvim_create_user_command('ReplOpen', function()
 	repl:open()
 end, { desc = 'Open repl' })
 
+vim.api.nvim_create_user_command('CabalReplOpen', function()
+	local repl = require('alex.repl').cabal_repl()
+	if not repl then return end
+	repl:open()
+end, { desc = 'Open cabal repl' })
+
 vim.api.nvim_create_user_command('ReplConnect', function()
 	local repl_ = require('alex.repl')
 	local repl = repl_.buffer_repl(0)
@@ -132,7 +138,7 @@ vim.api.nvim_create_user_command('Focus', function()
 	vim.keymap.set('n', '<leader>ft', on_unfocused);
 end, { desc = 'Focus.' })
 
-local swap_files_open_cmd = 'Explore ' .. vim.fn.stdpath('state') .. '/swap'
+local swap_files_open_cmd = 'edit ' .. vim.fn.stdpath('state') .. '/swap'
 vim.api.nvim_create_user_command('SwapFilesOpen', function()
 	vim.cmd(swap_files_open_cmd)
 end, { desc = 'Open swap file directory' })

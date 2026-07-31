@@ -76,7 +76,7 @@ end)
 
 local function load_plugin(pack)
 	local data = pack.spec.data
-	local ok, plugin = pcall(require, pack.spec.name)
+	local ok, plugin = pcall(require, pack.spec.data.name or pack.spec.name)
 	if ok then
 		if not data then
 			if plugin.setup then

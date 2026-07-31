@@ -4,17 +4,31 @@ local job = require('alex.repl.job')
 
 local ghci_repl = nil
 
+---@param input string[]
+---@return string|string[]
+local function escape_ghci_input(input)
+	table.insert(input, 1, ':{')
+	table.insert(input, ':}')
+	return input
+end
+
 ---@return alex.repl.job.Repl?
 function M.ghci_repl()
 	if ghci_repl then return ghci_repl end
 	ghci_repl = job.Repl.new('GHCI', {'ghci'}, {
-		escape_input = function (input)
-			table.insert(input, 1, ':{')
-			table.insert(input, ':}')
-			return input
-		end
+		escape_input = escape_ghci_input
 	})
 	return ghci_repl
+end
+
+local cabal_repl = nil
+
+function M.cabal_repl()
+	if cabal_repl then return cabal_repl end
+	cabal_repl = job.Repl.new('Cabal', {'cabal', 'repl'}, {
+		escape_input = escape_ghci_input
+	})
+	return cabal_repl
 end
 
 local scheme_repl = nil
@@ -110,18 +124,21 @@ function M.python_repl()
 	return python_repl
 end
 
-local ft_tbl = {
-	lua = M.lua_repl,
-	scheme = M.scheme_repl,
-	haskell = M.ghci_repl,
-	javascript = M.node_repl,
-	python = M.python_repl
+---@type table<string, { repl: fun(): alex.repl.job.Repl? }>
+M.filetype_repl_table = {
+	lua = { repl = M.lua_repl },
+	scheme = { repl = M.scheme_repl },
+	haskell = { repl = M.ghci_repl },
+	javascript = { repl = M.node_repl },
+	python = { repl = M.python_repl }
 }
 
 ---@param buf integer
 ---@return alex.repl.job.Repl?
 function M.buffer_repl(buf)
-	return ft_tbl[vim.bo[buf].filetype]()
+	local entry = M.filetype_repl_table[vim.bo[buf].filetype]
+	if not entry then return end
+	return entry.repl()
 end
 
 return M

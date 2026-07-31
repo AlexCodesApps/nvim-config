@@ -1,6 +1,6 @@
 local overrides = {
 	{{ 'json', 'json5', 'jsonc', 'jsonl' }, { icon = '', }},
-	{{ '.vimrc', '_vimrc', '.gvimrc', '_gvimrc'}, { icon = '', }},
+	{{ '.vimrc', '_vimrc', '.gvimrc', '_gvimrc', 'vim' }, { icon = '', }},
 	{{ 'js' }, { icon = '' }},
 	{{ 'markdown' }, { icon = '' }},
 }

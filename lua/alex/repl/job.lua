@@ -65,7 +65,7 @@ end
 ---@return boolean
 function M.Repl:start()
 	if self.jid ~= -1 and vim.fn.jobwait({self.jid}, 0)[1] ~= -1 then
-		self:shutdown()
+		self:close()
 	end
 	if self.buf ~= -1 then
 		return true
@@ -96,7 +96,7 @@ function M.Repl:start()
 	vim.api.nvim_create_autocmd('BufDelete', {
 		buf = buf,
 		group = self.augroup,
-		callback = function() self.buf = -1 ; self:shutdown() end
+		callback = function() self.buf = -1 ; self:close() end
 	})
 	vim.api.nvim_create_autocmd({ 'WinEnter', 'BufEnter' }, {
 		buf = buf,
@@ -114,7 +114,7 @@ function M.Repl:start()
 	return true
 end
 
-function M.Repl:shutdown()
+function M.Repl:close()
 	vim.api.nvim_clear_autocmds {
 		group = self.augroup
 	}
@@ -128,10 +128,14 @@ function M.Repl:shutdown()
 	self.buf, self.jid = -1, -1
 end
 
----@param input string[]
+---@param input string|string[]
 function M.Repl:send_input(input)
 	if not self:start() then return end
-	input = vim.deepcopy(input)
+	if type(input) == 'string' then
+		input = vim.split(input, '\n')
+	else
+		input = vim.deepcopy(input)
+	end
 	local escaped = self.escape_input(input)
 	if type(escaped) ~= 'string' then
 		escaped[#escaped + 1] = ''
@@ -140,6 +144,13 @@ function M.Repl:send_input(input)
 		escaped = escaped .. '\n'
 	end
 	escaped = escaped:gsub('\t', '    ')
+	vim.api.nvim_chan_send(self.jid, escaped)
+end
+
+---@param input string
+function M.Repl:send_oneline_input(input)
+	if not self:start() then return end
+	local escaped = input:gsub('\t', '    ') .. '\n'
 	vim.api.nvim_chan_send(self.jid, escaped)
 end
 

@@ -9,6 +9,8 @@
 
 (define transcoder (make-transcoder (utf-8-codec)))
 
+(define sandboxed-environment (copy-environment (scheme-environment)))
+
 (define (utf8->bytevector utf8)
   (string->bytevector utf8 transcoder))
 
@@ -45,38 +47,35 @@
 
 (define (expr->string e)
   (call-with-string-output-port
-   (lambda (out) (write e out))))
+    (lambda (out) (write e out))))
 
 (define (error->string err)
   (string-append
    "ERROR: "
-   (if (message-condition? err)
-       (condition-message err) (expr->string err))))
+   (call-with-string-output-port
+     (lambda (out) (display-condition err out)))))
 
 (define (eval-expr->string code)
-  (call/cc
-   (lambda (k)
-     (with-exception-handler
-	 (lambda (err)
-	   (k (string-append
-	       "ERROR: "
-	       (if (message-condition? err)
-		   (condition-message err) (expr->string err)))))
-       (lambda ()
-	 (expr->string (eval code (interaction-environment))))))))
+  (with-output-to-string
+    (lambda ()
+      (let ([result (eval code sandboxed-environment)])
+        (when (not (eq? result (void)))
+          (write result))))))
 
 (define stdin (standard-input-port))
 (define stdout (standard-output-port))
 
-(define (loop)
-  (let* ([msg (recv-message-utf8 stdin stdout)]
-         [code (read (open-input-string msg))])
-  (send-message-utf8 (eval-expr->string code) stdout)))
+(define (run-msg port send)
+  (let loop ([code (read port)] [chunks '()])
+    (if (eof-object? code)
+      (send (eval-expr->string (cons 'begin (reverse chunks))))
+      (loop (read port) (cons code chunks)))))
 
 (define (main)
   (guard
     (err [else (send-message-utf8 (error->string err) stdout)])
-    (loop))
+    (run-msg (open-input-string (recv-message-utf8 stdin stdout))
+             (lambda (out) (send-message-utf8 out stdout))))
   (main))
 
 (main)

@@ -1,5 +1,12 @@
 local M = {}
 
+local _pack = table.pack
+
+---@param fst? integer
+local function _unpack(tbl, fst)
+	return table.unpack(tbl, fst, tbl.n)
+end
+
 local RESOLVED_UNRESOLVED = 0
 local RESOLVED_RESOLVED = 1
 local RESOLVED_ERROR = 2
@@ -15,7 +22,10 @@ M.Future.__index = M.Future
 ---@param slot any
 ---@param resolved 1|2
 function M.Future:raw_resolve(slot, resolved)
-	assert(self.resolved == RESOLVED_UNRESOLVED)
+	if not (self.resolved == RESOLVED_UNRESOLVED) then
+		local msg = vim.inspect({ msg = 'future has been resolved twice', old_resolve = self.resolved, old_slot = self.slot, new_resolve = resolved, new_slot = slot })
+		error(msg)
+	end
 	self.slot = slot
 	self.resolved = resolved
 	if #self.callbacks ~= 0 then
@@ -27,8 +37,19 @@ function M.Future:raw_resolve(slot, resolved)
 	end
 end
 
+---@param ok boolean
+---@param ... any
+function M.Future:presolve(ok, ...)
+	if ok then
+		self:raw_resolve(_pack(...), RESOLVED_RESOLVED)
+	else
+		local err = ...
+		self:raw_resolve(err, RESOLVED_ERROR)
+	end
+end
+
 function M.Future:resolve(...)
-	self:raw_resolve(table.pack(...), RESOLVED_RESOLVED)
+	self:raw_resolve(_pack(...), RESOLVED_RESOLVED)
 end
 
 function M.Future:reject(err)
@@ -39,7 +60,7 @@ end
 ---@return alex.async.Future
 function M.Future:setup(cb)
 	local function res(...)
-		self:raw_resolve(table.pack(...), RESOLVED_RESOLVED)
+		self:raw_resolve(_pack(...), RESOLVED_RESOLVED)
 	end
 	local function rej(err)
 		self:raw_resolve(err, RESOLVED_ERROR)
@@ -49,7 +70,7 @@ function M.Future:setup(cb)
 end
 
 ---@return alex.async.Future
-function M.Future:init()
+function M.Future.init()
 	return setmetatable({
 		resolved = RESOLVED_UNRESOLVED,
 		callbacks = {}
@@ -58,14 +79,14 @@ end
 
 ---@param cb fun(res, rej)
 ---@return alex.async.Future
-function M.Future:new(cb)
-	return M.Future:init():setup(cb)
+function M.Future.new(cb)
+	return M.Future.init():setup(cb)
 end
 
 ---@return alex.async.Future
-function M.Future:value(...)
+function M.Future.value(...)
 	return setmetatable({
-		slot = table.pack(...),
+		slot = _pack(...),
 		resolved = RESOLVED_RESOLVED,
 		callbacks = {}
 	}, M.Future)
@@ -73,7 +94,7 @@ end
 
 ---@param err any
 ---@return alex.async.Future
-function M.Future:err(err)
+function M.Future.err(err)
 	return setmetatable({
 		slot = err,
 		resolved = RESOLVED_ERROR,
@@ -83,10 +104,11 @@ end
 
 ---@param res? fun(...)
 ---@param rej? fun(err)
+---@return self
 function M.Future:listen(res, rej)
 	local function onresrej(val, status)
 		if status == RESOLVED_RESOLVED then
-			if res then res(table.unpack(val, 1, val.n)) end
+			if res then res(_unpack(val)) end
 		elseif status == RESOLVED_ERROR then
 			if rej then rej(val) end
 		else
@@ -95,20 +117,47 @@ function M.Future:listen(res, rej)
 	end
 	if self.resolved ~= RESOLVED_UNRESOLVED then
 		onresrej(self.slot, self.resolved)
-		return
+		return self
 	end
 	self.callbacks[#self.callbacks+1] = onresrej
+	return self
+end
+
+local function assert_is_future(x)
+    assert(type(x) == "table", "expected Future")
+    assert(getmetatable(x) == M.Future, "expected Future")
+    return x
 end
 
 ---@param res? fun(...): alex.async.Future
 ---@param rej? fun(err): alex.async.Future
 ---@return alex.async.Future
 function M.Future:bind(res, rej)
-	return M.Future:new(function(_res, _rej)
+	return M.Future.new(function(_res, _rej)
 		self:listen(function (...)
-			if res then res(...):listen(_res, _rej) else _res(...) end
+			if not res then
+				_res(...)
+				return
+			end
+			local fut = res(...)
+			if fut then
+				assert_is_future(fut)
+				fut:listen(_res, _rej)
+			else
+				_res()
+			end
 		end, function (err)
-			if rej then rej(err):listen(_res, _rej) else _rej(err) end
+			if not rej then
+				_rej(err)
+				return
+			end
+			local fut = rej(err)
+			if fut then
+				assert_is_future(fut)
+				fut:listen(_res, _rej)
+			else
+				_res()
+			end
 		end)
 	end)
 end
@@ -122,6 +171,67 @@ end
 ---@return alex.async.Future
 function M.Future:catch(rej)
 	return self:bind(nil, rej)
+end
+
+---@return self
+function M.Future:report_err()
+	self:listen(nil, function(rej)
+		local msg = vim.iter(vim.gsplit(tostring(rej), '\n', { plain = true }))
+						:map(function(line)
+							return { line }
+						end)
+						:totable()
+		vim.schedule(function()
+			vim.api.nvim_echo(msg, true, {
+				err = true
+			})
+		end)
+	end)
+	return self
+end
+
+---@param next fun(ok: boolean, ...: any): alex.async.Future
+---@return alex.async.Future
+function M.Future:pbind(next)
+	return self:bind(function(...)
+		return next(true, ...)
+	end, function(rej)
+		return next(false, rej)
+	end)
+end
+
+---@return alex.async.Future
+function M.Future:yield_if_fast()
+	return self:pbind(function(ok, ...)
+		if not vim.in_fast_event() then
+			return self
+		end
+		local args = _pack(ok, ...)
+		local fut = M.Future.init()
+		vim.schedule(function()
+			fut:presolve(_unpack(args))
+		end)
+		return fut
+	end)
+end
+
+---@param timeout? integer
+function M.Future:sync_wait(timeout)
+	timeout = timeout or 3000
+	local function poll()
+		return self:isresolved()
+	end
+	local ok = vim.wait(timeout, poll, 10)
+	if not ok then
+		error('timeout')
+	else
+		if self.resolved == RESOLVED_ERROR then
+			error(self.slot)
+		else
+			assert(self.resolved == RESOLVED_RESOLVED)
+			return _unpack(self.slot)
+		end
+	end
 end
 
 ---@return boolean
@@ -141,7 +251,7 @@ M.Task.__index = M.Task
 local running_task = nil
 
 ---@return boolean
-function M.Task:running()
+function M.Task.running()
 	return running_task ~= nil and coroutine.running() == running_task.thread
 end
 
@@ -151,7 +261,7 @@ function M.Task:currently_running()
 end
 
 ---@return alex.async.Task
-function M.Task:get_running()
+function M.Task.get_running()
 	assert(running_task, 'async task must be running')
 	return running_task
 end
@@ -164,21 +274,21 @@ function M.Task:suspend()
 		t = self.cached_resume
 		self.cached_resume = nil
 	else
-		t = table.pack(coroutine.yield())
+		t = _pack(coroutine.yield())
 	end
 	assert(t)
 	if not t[1] then
 		error(t[2])
 	end
-	return table.unpack(t, 2, t.n)
+	return _unpack(t, 2)
 end
 
 ---@param ok boolean
----@return alex.async.Task
+---@return self
 function M.Task:raw_resume(ok, ...)
 	if self:currently_running() then
 		assert(self.cached_resume == nil)
-		self.cached_resume = table.pack(ok, ...)
+		self.cached_resume = _pack(ok, ...)
 		return self
 	end
 	local status = coroutine.status(self.thread)
@@ -186,29 +296,35 @@ function M.Task:raw_resume(ok, ...)
 	assert(status ~= 'dead')
 	local parent = running_task
 	running_task = self
-	local rok, err = coroutine.resume(self.thread, ok, ...)
+	local result = _pack(coroutine.resume(self.thread, ok, ...))
 	running_task = parent
-	if not rok then
-		self.result:reject(err)
+	if not result[1] then
+		self.result:reject(result[2])
+	elseif coroutine.status(self.thread) == 'dead' then
+		self.result:resolve(_unpack(result, 2))
 	end
 	return self
 end
 
+
+---@return self
 function M.Task:resume(...)
 	return self:raw_resume(true, ...)
 end
 
+
+---@return self
 function M.Task:resume_err(...)
 	return self:raw_resume(false, ...)
 end
 
 ---@param onstart function
 ---@return alex.async.Task
-function M.Task:new(onstart)
-	local future = M.Future:init()
+function M.Task.new(onstart)
+	local future = M.Future.init()
 	local thread = coroutine.create(function(ok, ...)
 		assert(ok)
-		future:resolve(onstart(...))
+		return onstart(...)
 	end)
 	local task = setmetatable({
 		thread = thread,
@@ -220,8 +336,8 @@ end
 
 ---@param onstart function
 ---@return alex.async.Task
-function M.Task:start(onstart, ...)
-	return M.Task:new(onstart):resume(...)
+function M.Task.start(onstart, ...)
+	return M.Task.new(onstart):resume(...)
 end
 
 ---@return alex.async.Future
@@ -236,7 +352,7 @@ end
 ---@async
 ---@return ...
 function M.Future:await()
-	local task = M.Task:get_running()
+	local task = M.Task.get_running()
 	self:listen(function(...)
 		task:resume(...)
 	end, function(rej)
@@ -246,20 +362,14 @@ function M.Future:await()
 end
 
 ---@async
+---@param cb fun(cb: fun(...): ...)
 ---@return ...
 function M.callback_suspend(cb)
-	local task = M.Task:get_running()
+	local task = M.Task.get_running()
 	cb(function(...)
 		task:resume(...)
 	end)
 	return task:suspend()
-end
-
----@return alex.async.Future
-function M.callback_wrap(cb)
-	return M.Future:new(function(res)
-		cb(res)
-	end)
 end
 
 ---@async
@@ -267,10 +377,18 @@ function M.yield()
 	M.callback_suspend(vim.schedule)
 end
 
+
+---@async
+function M.yield_if_fast()
+	if vim.in_fast_event() then
+		M.yield()
+	end
+end
+
 ---@param timeout number ms
 ---@return alex.async.Future
 function M.sleep(timeout)
-	return M.Future:new(function(res)
+	return M.Future.new(function(res)
 		vim.defer_fn(res, timeout)
 	end)
 end
@@ -278,12 +396,12 @@ end
 ---@async
 ---@return boolean ok
 ---@return any ...
-function M.pcall(fun, ...)
-	local args = table.pack(...)
-	local task = M.Task:start(function()
-		return fun(table.unpack(args, 1, args.n))
+function M.copcall(fun, ...)
+	local args = _pack(...)
+	local task = M.Task.start(function()
+		return fun(_unpack(args))
 	end)
-	local current = M.Task:get_running()
+	local current = M.Task.get_running()
 	task:future():listen(function (...)
 		current:resume(true, ...)
 	end, function(err)
@@ -295,7 +413,10 @@ end
 ---@param futs alex.async.Future[]
 ---@return alex.async.Future
 function M.all(futs)
-	local ret = M.Future:init()
+	if #futs == 0 then
+		return M.Future.value()
+	end
+	local ret = M.Future.init()
 	local count = #futs
 	for _, fut in pairs(futs) do
 		fut:sequence(function()
@@ -312,7 +433,7 @@ end
 ---@param timeout number ms
 ---@return alex.async.Future
 function M.timeout(fut, timeout)
-	local f = M.Future:init()
+	local f = M.Future.init()
 	local timer = vim.defer_fn(function()
 		f:resolve(false)
 	end, timeout)
@@ -338,7 +459,7 @@ M.Semaphore.__index = M.Semaphore
 
 ---@param cur number?
 ---@return alex.async.Semaphore
-function M.Semaphore:new(cur)
+function M.Semaphore.new(cur)
 	return setmetatable({
 		cur = cur or 0,
 		waiters = {}
@@ -354,12 +475,21 @@ function M.Semaphore:signal()
 	self.cur = self.cur + 1
 end
 
+function M.Semaphore:signal_all()
+	if #self.waiters == 0 then return end
+	local waiters = self.waiters
+	self.waiters = {}
+	for _, waiter in pairs(waiters) do
+		waiter()
+	end
+end
+
 ---@return alex.async.Future
 function M.Semaphore:wait()
 	if self:try_wait() then
-		return M.Future:value()
+		return M.Future.value()
 	end
-	return M.Future:new(function(res)
+	return M.Future.new(function(res)
 		self.waiters[#self.waiters+1] = res
 	end)
 end
@@ -373,55 +503,103 @@ function M.Semaphore:try_wait()
 	return false
 end
 
+---@class alex.async.Mutex
+---@field locked boolean
+---@field waiters function[]
+M.Mutex = {}
+M.Mutex.__index = M.Mutex
+
+function M.Mutex.new()
+	return setmetatable({
+		locked = false,
+		waiters = {}
+	}, M.Mutex)
+end
+
+---@return alex.async.Future
+function M.Mutex:lock()
+	if not self.locked then
+		self.locked = true
+		return M.Future.value()
+	end
+	return M.Future.new(function(res)
+		self.waiters[#self.waiters+1] = res
+	end)
+end
+
+function M.Mutex:unlock()
+	if #self.waiters ~= 0 then
+		vim.schedule(table.remove(self.waiters, 1))
+	else
+		self.locked = false
+	end
+end
+
+function M.Mutex:try_lock()
+	if not self.locked then
+		self.locked = true
+		return true
+	end
+	return false
+end
+
+---@return alex.async.Future
+function M.Mutex:with_lock(f)
+	local function body()
+		self:lock():await()
+		local results = _pack(M.copcall(f))
+		self:unlock()
+		if not results[1] then
+			error(results[2])
+		end
+		return _unpack(results, 2)
+	end
+	return M.Task.start(function()
+		return body()
+	end):future()
+end
+
 ---@class alex.async.Mpsc
 ---@field reader? alex.async.Task
 ---@field backing any[]
----@field limit alex.async.Semaphore
----@field closed boolean
+---@field cancelled boolean
 M.Mpsc = {}
 M.Mpsc.__index = M.Mpsc
 
----@param limit? number
-function M.Mpsc:new(limit)
-	limit = limit or math.huge
+function M.Mpsc.new()
 	return setmetatable({
 		backing = {},
-		limit = M.Semaphore:new(limit),
 		closed = false
 	}, M.Mpsc)
 end
 
----@return alex.async.Future
+---@return boolean
 function M.Mpsc:push(val)
-	if self.closed then
-		return M.Future:value(false)
+	if self.cancelled then
+		return false
 	end
 	local reader = self.reader
 	if reader then
 		self.reader = nil
-		reader:resume(val)
-		return M.Future:value(true)
+		reader:resume(true, val)
+	else
+		self.backing[#self.backing+1] = val
 	end
-	return self.limit
-		:wait()
-		:bind(function()
-			self.backing[#self.backing+1] = val
-			return M.Future:value(true)
-		end)
+	return true
 end
 
 ---@return boolean ok
 ---@return any ...
 function M.Mpsc:pop()
-	local task = M.Task:get_running()
+	local task = M.Task.get_running()
 	local ok, val = self:try_pop()
 	if not ok then
-		if self.closed then
+		if self.cancelled then
 			return false
 		end
 		assert(self.reader == nil)
 		self.reader = task
-		val = task:suspend()
+		return task:suspend()
 	end
 	return true, val
 end
@@ -433,48 +611,60 @@ function M.Mpsc:try_pop()
 		return false
 	end
 	local val = table.remove(self.backing, 1)
-	self.limit:signal()
 	return true, val
 end
 
-function M.Mpsc:close()
-	self.closed = true
-	if self.reader then
-		self.reader:resume(false)
+function M.Mpsc:shutdown()
+	if self.cancelled then return end
+	self.cancelled = true
+	local reader = self.reader
+	if reader then
 		self.reader = nil
+		reader:resume(false)
 	end
 end
 
----@class alex.Async.Actor
+function M.Mpsc:is_empty()
+	return self.cancelled
+		and #self.backing == 0
+end
+
+function M.Mpsc:close()
+	self:shutdown()
+	self.backing = {}
+end
+
+---@class alex.async.Actor
 ---@field private queue alex.async.Mpsc
 ---@field private thread alex.async.Task
 M.Actor = {}
 M.Actor.__index = M.Actor
 
 function M.Actor:serve(onreq)
-	while not self.thread.cancelled do
+	while not self.thread.cancelled and vim.v.exiting == vim.NIL do
 		local ok, req = self.queue:pop()
 		if not ok then break end
-		local result = table.pack(M.pcall(onreq, table.unpack(req.args, 1, req.args.n)))
-		if not result[1] then
-			req.fut:reject(result[2])
-		else
-			req.fut:resolve(table.unpack(result, 2, result.n))
-		end
+		req.fut:presolve(M.copcall(onreq, _unpack(req.args)))
 		M.yield()
+	end
+	self.queue:shutdown()
+	while true do
+		local ok, req = self.queue:try_pop()
+		if not ok then break end
+		req.fut:reject('cancelled actor')
 	end
 end
 
----@param onreq fun(any)
----@return alex.Async.Actor
-function M.Actor:new(onreq)
-	---@type alex.Async.Actor
+---@param onreq fun(any): ...
+---@return alex.async.Actor
+function M.Actor.new(onreq)
+	---@type alex.async.Actor
 	local actor
-	local task = M.Task:new(function()
+	local task = M.Task.new(function()
 		actor:serve(onreq)
 	end)
 	actor = setmetatable({
-		queue = M.Mpsc:new(1000),
+		queue = M.Mpsc.new(),
 		thread = task
 	}, M.Actor)
 	task:resume()
@@ -483,17 +673,21 @@ end
 
 ---@return alex.async.Future
 function M.Actor:request(...)
-	local fut = M.Future:init()
+	local fut = M.Future.init()
 	local req = {
-		args = table.pack(...),
+		args = _pack(...),
 		fut = fut
 	}
 	self.queue:push(req)
 	return fut
 end
 
+function M.Actor:shutdown()
+	self.queue:shutdown()
+end
+
 function M.Actor:close()
-	self.queue:close()
+	self.thread:cancel()
 end
 
 ---@return alex.async.Future
@@ -508,11 +702,11 @@ M.vim = {}
 ---@return alex.async.Future on_exit
 function M.vim.system(cmd, opts)
 	local obj
-	local fut = M.callback_wrap(function(cb)
+	local fut = M.Future.new(function(res)
 		if opts then
-			obj = vim.system(cmd, opts, cb)
+			obj = vim.system(cmd, opts, res)
 		else
-			obj = vim.system(cmd, cb)
+			obj = vim.system(cmd, res)
 		end
 	end)
 	assert(obj)
@@ -520,4 +714,7 @@ function M.vim.system(cmd, opts)
 end
 
 M.nursery = require('alex.async.nursery')
+M.stream = require('alex.async.stream')
+M.uv = require('alex.async.uv')
+
 return M

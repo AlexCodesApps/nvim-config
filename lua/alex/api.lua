@@ -24,68 +24,6 @@ function M.edit_file(filename, mode)
 	vim.cmd(cmd)
 end
 
-do -- queue
-	---@class alex.api.Queue
-	---@field private tasks any[]
-	---@field private onreq fun(any)
-	---@field private onclose? fun()
-	---@field private start_contcb boolean
-	---@field closed boolean
-	M.queue = {}
-	M.queue.__index = M.queue
-
-	local function next(queue)
-		local req = table.remove(queue.tasks, 1)
-		if req == nil then
-			queue.start_contcb = true
-			if queue.closed and queue.onclose then
-				queue.onclose()
-			end
-			return
-		end
-		local co = coroutine.create(function()
-			queue.onreq(req)
-			return next(queue)
-		end)
-		coroutine.resume(co)
-	end
-
-	---@param onreq fun(any)
-	---@param onclose? fun()
-	function M.queue.new(onreq, onclose)
-		return setmetatable({
-			tasks = {},
-			onreq = onreq,
-			onclose = onclose,
-			start_contcb = true
-		}, M.queue)
-	end
-
-	---@return boolean
-	function M.queue:push(req)
-		if self.closed then
-			return false
-		end
-		self.tasks[#self.tasks + 1] = req
-		if self.start_contcb then
-			self.start_contcb = false
-			vim.schedule(function()
-				next(self)
-			end)
-		end
-		return true
-	end
-
-	function M.queue:close()
-		if self.closed then return end
-		self.closed = true
-		if not self.onclose then return end
-		if self.start_contcb then
-			self.onclose()
-		end
-	end
-end -- queue
-
 ---@param name string
 function M.lsp_client_available(name)
 	local config = vim.lsp.config[name]
@@ -110,7 +48,7 @@ function M.try_enable_clang_format(bufnr)
 		M.try_enable_clang_format = function() end
 		return false
 	else
-		function _G.ClangFormat()
+		local clang_format = require('alex.vimffi').Object.new(function()
 			local cwd = vim.b.clang_format_root
 			if not cwd then
 				cwd = vim.fs.root(0, '.clang-format')
@@ -133,11 +71,11 @@ function M.try_enable_clang_format(bufnr)
 				lines[#lines] = nil
 			end
 			vim.api.nvim_buf_set_lines(0, vim.v.lnum-1, vim.v.lnum-1+vim.v.count, true, lines)
-		end
+		end)
 ---@diagnostic disable-next-line: redefined-local
 		M.try_enable_clang_format = function(bufnr)
 			bufnr = bufnr or 0
-			vim.bo[bufnr].formatexpr = 'v:lua.ClangFormat()'
+			vim.bo[bufnr].formatexpr = clang_format:vim_script_name() .. '()'
 			return true
 		end
 		return M.try_enable_clang_format(bufnr)

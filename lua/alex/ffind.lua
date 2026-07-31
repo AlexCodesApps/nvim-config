@@ -614,7 +614,7 @@ function M.grep_files(config)
 		if gitignore then
 			cmd = { "rg", "-n", "--no-heading", input };
 		else
-			cmd = { "rg", "-n", "--no-heading", "--no-ignore", input }
+			cmd = { "rg", "-uu", "-n", "--no-heading", "--no-ignore", input }
 		end
 		running_future = vim.system(cmd, { cwd = cwd, text = true }, function(result)
 			running_future = nil
