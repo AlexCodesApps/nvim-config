@@ -141,14 +141,16 @@ vim.keymap.set('n', '<leader>fdr', function()
 end)
 
 vim.keymap.set({'n', 'x'}, '<M-e>', function()
-	local repl = require('alex.repl').buffer_repl(0)
-	if not repl then return end
-	repl:register_buffer(0)
+	local repl = require('alex.repl').get_repl_for_buffer(0)
+	if not repl then return '' end
+	repl:setup_buffer(0)
 	return '<M-e>'
 end, { expr = true })
 vim.keymap.set('n', '<M-p>', function()
-	local repl = require('alex.repl').buffer_repl(0)
-	if not repl then return end
-	repl:register_buffer(0)
+	local repl = require('alex.repl').get_repl_for_buffer(0)
+	if not repl then return '' end
+	repl:setup_buffer(0)
 	return '<M-p>'
 end, { expr = true })
+
+vim.keymap.set({'n', 'i', 't'}, '<C-x><C-z>', ':ReplToggle<CR>')

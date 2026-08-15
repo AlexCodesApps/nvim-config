@@ -36,6 +36,7 @@ vim.api.nvim_create_autocmd('LspAttach', {
 		if client and client:supports_method('textDocument/completion') then
 			vim.o.complete = 'o'
 			vim.keymap.set('i', '<CR>', function()
+				-- could use 'vim.fn.state' instead ...
 				if vim.fn.pumvisible() == 1 then
 					return '<C-e><CR>'
 				end
@@ -82,3 +83,4 @@ vim.lsp.enable('emmet_language_server')
 vim.lsp.enable('rust-analyzer')
 vim.lsp.enable('gopls')
 vim.lsp.enable('pyright')
+vim.lsp.enable('hls')

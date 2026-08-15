@@ -17,30 +17,40 @@ local inline_repl = require('alex.repl.inline')
 
 vim.api.nvim_create_user_command('ReplOpen', function()
 	local repl_ = require('alex.repl')
-	local repl = repl_.buffer_repl(0)
+	local repl = repl_.get_repl_for_buffer(0)
 	if not repl then return end
-	repl:open()
+	repl:open(0)
 end, { desc = 'Open repl' })
 
-vim.api.nvim_create_user_command('CabalReplOpen', function()
-	local repl = require('alex.repl').cabal_repl()
+vim.api.nvim_create_user_command('ReplClose', function()
+	local repl_ = require('alex.repl')
+	local repl = repl_.get_repl_for_buffer(0)
 	if not repl then return end
-	repl:open()
-end, { desc = 'Open cabal repl' })
+	repl:close()
+end, { desc = 'Close repl' })
+
+vim.api.nvim_create_user_command('ReplToggle', function()
+	local repl_ = require('alex.repl')
+	local repl = repl_.get_repl_for_buffer(0)
+	if not repl then return end
+	repl:toggle(0)
+end, { desc = 'Toggle repl' })
+
+
 
 vim.api.nvim_create_user_command('ReplConnect', function()
 	local repl_ = require('alex.repl')
-	local repl = repl_.buffer_repl(0)
+	local repl = repl_.get_repl_for_buffer(0)
 	if not repl then return end
-	repl:register_buffer(0)
+	repl:setup_buffer(0)
 end, { desc = 'Connect repl' })
 
 vim.api.nvim_create_user_command('ReplEvalBuf', function()
 	local repl_ = require('alex.repl')
-	local repl = repl_.buffer_repl(0)
+	local repl = repl_.get_repl_for_buffer(0)
 	if not repl then return end
 	local lines = vim.api.nvim_buf_get_lines(0, 0, -1, false)
-	repl:send_input(lines)
+	repl:send(lines)
 end, { desc = 'Eval buffer' })
 
 vim.api.nvim_create_user_command('InlineEval', function(opts)

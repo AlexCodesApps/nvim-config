@@ -4,6 +4,7 @@ local M = {}
 ---@field id integer
 ---@field augroup integer
 ---@field buf integer
+---@field win integer
 ---@field jid integer
 ---@field argv string[]
 ---@field escape_input fun(input: string[]): string[]|string
@@ -51,11 +52,12 @@ function M.Repl.new(name, argv, opts)
 	local id = id_counter
 	id_counter = id_counter + 1
 	local augroup = vim.api.nvim_create_augroup(name .. 'Repl', {})
-	local buf, jid = -1, -1
+	local buf, jid, win = -1, -1, -1
 	return setmetatable({
 		id = id,
 		augroup = augroup,
 		buf = buf,
+		win = win,
 		jid = jid,
 		argv = argv,
 		escape_input = escape_input
@@ -65,7 +67,7 @@ end
 ---@return boolean
 function M.Repl:start()
 	if self.jid ~= -1 and vim.fn.jobwait({self.jid}, 0)[1] ~= -1 then
-		self:close()
+		self:shutdown()
 	end
 	if self.buf ~= -1 then
 		return true
@@ -74,8 +76,8 @@ function M.Repl:start()
 	local jid = vim.api.nvim_buf_call(buf, function()
 		return vim.fn.jobstart(self.argv, {
 			on_stdout = function(_, _, _)
-				local winid = vim.fn.bufwinid(buf)
-				if winid == -1 or vim.api.nvim_get_current_win() == winid then
+				local winid = self.win
+				if not vim.api.nvim_win_is_valid(winid) or vim.api.nvim_get_current_win() == winid then
 					return
 				end
 				vim.schedule(function()
@@ -96,7 +98,7 @@ function M.Repl:start()
 	vim.api.nvim_create_autocmd('BufDelete', {
 		buf = buf,
 		group = self.augroup,
-		callback = function() self.buf = -1 ; self:close() end
+		callback = function() self.buf = -1 ; self:shutdown() end
 	})
 	vim.api.nvim_create_autocmd({ 'WinEnter', 'BufEnter' }, {
 		buf = buf,
@@ -114,7 +116,7 @@ function M.Repl:start()
 	return true
 end
 
-function M.Repl:close()
+function M.Repl:shutdown()
 	vim.api.nvim_clear_autocmds {
 		group = self.augroup
 	}
@@ -129,7 +131,7 @@ function M.Repl:close()
 end
 
 ---@param input string|string[]
-function M.Repl:send_input(input)
+function M.Repl:send(input)
 	if not self:start() then return end
 	if type(input) == 'string' then
 		input = vim.split(input, '\n')
@@ -148,42 +150,38 @@ function M.Repl:send_input(input)
 end
 
 ---@param input string
-function M.Repl:send_oneline_input(input)
+function M.Repl:send_line(input)
 	if not self:start() then return end
 	local escaped = input:gsub('\t', '    ') .. '\n'
 	vim.api.nvim_chan_send(self.jid, escaped)
 end
 
----@param buf integer
-function M.Repl:register_buffer(buf)
-	vim.keymap.set('x', '<M-e>', function()
-	   local region = vim.fn.getregion(vim.fn.getpos('v'), vim.fn.getpos('.'), {
-		 type = vim.fn.mode(),
-		 exclusive = false,
-		 eol = false,
-	   })
-	   self:send_input(region)
-	end, { buf = buf })
-	vim.keymap.set('n', '<M-e>', function()
-		 vim.treesitter.get_parser(buf):parse()
-		local node = vim.treesitter.get_node()
-		if not node then return end
-		local srow, scol = node:start()
-		local erow, ecol = node:end_()
-		local region = vim.api.nvim_buf_get_text(buf, srow, scol, erow, ecol, {})
-	   self:send_input(region)
-	end, { buf = buf })
-	vim.keymap.set('n', '<M-p>', 'vip<M-e><Esc>', { buf = buf, remap = true })
-end
-
+---@return boolean
 function M.Repl:open()
-	if not self:start() then return end
-	local buf = vim.api.nvim_get_current_buf()
-	vim.api.nvim_open_win(self.buf, false, {
+	if not self:start() then return false end
+	self.win = vim.api.nvim_open_win(self.buf, false, {
 		split = 'below',
 		height = math.ceil(vim.o.columns / 13)
 	})
-	self:register_buffer(buf)
+	return true
+end
+
+function M.Repl:close()
+	local winid = self.win
+	if vim.api.nvim_win_is_valid(winid) then
+		vim.api.nvim_win_close(winid, true)
+		self.win = -1
+	end
+end
+
+function M.Repl:toggle()
+	local winid = self.win
+	if not vim.api.nvim_win_is_valid(winid) then
+		self:open()
+	else
+		vim.api.nvim_win_close(winid, true)
+		self.win = -1
+	end
 end
 
 return M

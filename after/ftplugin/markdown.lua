@@ -3,6 +3,9 @@ vim.wo.wrap = true
 vim.wo.relativenumber = false
 vim.keymap.set('n', 'j', 'gj', { buffer = true })
 vim.keymap.set('n', 'k', 'gk', { buffer = true })
+
+local api = require('alex.api')
+
 local function get_parent_section(node)
 	node = node or vim.treesitter.get_node()
 	while node and node:type() ~= 'section' do
@@ -22,11 +25,11 @@ end
 
 local function goto_node(node)
 	if not node then return end
-	local row, col = node:start()
-	vim.api.nvim_win_set_cursor(0, { row+1, col })
+	api.goto_node(node)
 end
 
 vim.keymap.set('n', '[n', function()
+	api.ensure_treesitter_parse()
 	local node = get_parent_section()
 	if not node then return end
 	local next = node:prev_named_sibling()
@@ -34,6 +37,7 @@ vim.keymap.set('n', '[n', function()
 end, { buffer = true })
 
 vim.keymap.set('n', ']n', function()
+	api.ensure_treesitter_parse()
 	local node = get_parent_section()
 	if not node then return end
 	local next = node:next_named_sibling()
@@ -41,6 +45,7 @@ vim.keymap.set('n', ']n', function()
 end, { buffer = true })
 
 vim.keymap.set('n', 'g[n', function()
+	api.ensure_treesitter_parse()
 	local node = get_parent_section():parent()
 	if not node then return end
 	node = get_parent_section(node)
@@ -48,6 +53,7 @@ vim.keymap.set('n', 'g[n', function()
 end, { buffer = true })
 
 vim.keymap.set('n', 'g]n', function()
+	api.ensure_treesitter_parse()
 	local node = get_child_section()
 	goto_node(node)
 end, { buffer = true })

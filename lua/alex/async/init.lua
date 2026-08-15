@@ -18,6 +18,30 @@ local RESOLVED_ERROR = 2
 M.Future = {}
 M.Future.__index = M.Future
 
+local function report_err(err)
+	local iter = vim.gsplit(tostring(err), '\n', {
+		plain = true
+	})
+	local msg = vim.iter(iter)
+					:map(function(line)
+						return { line }
+					end)
+					:totable()
+	vim.schedule(function()
+		vim.api.nvim_echo(msg, true, {
+			err = true
+		})
+	end)
+end
+
+---@param f fun(...)
+---@param ... any
+local function run_n_forget_cb(f, ...)
+	local ok, err = pcall(f, ...)
+	if ok then return end
+	report_err(err)
+end
+
 ---@private
 ---@param slot any
 ---@param resolved 1|2
@@ -32,7 +56,7 @@ function M.Future:raw_resolve(slot, resolved)
 		local callbacks = self.callbacks
 		self.callbacks = {}
 		for _, listener in pairs(callbacks) do
-			listener(slot, resolved)
+			run_n_forget_cb(listener, slot, resolved)
 		end
 	end
 end
@@ -116,7 +140,7 @@ function M.Future:listen(res, rej)
 		end
 	end
 	if self.resolved ~= RESOLVED_UNRESOLVED then
-		onresrej(self.slot, self.resolved)
+		run_n_forget_cb(onresrej, self.slot, self.resolved)
 		return self
 	end
 	self.callbacks[#self.callbacks+1] = onresrej
@@ -175,19 +199,7 @@ end
 
 ---@return self
 function M.Future:report_err()
-	self:listen(nil, function(rej)
-		local msg = vim.iter(vim.gsplit(tostring(rej), '\n', { plain = true }))
-						:map(function(line)
-							return { line }
-						end)
-						:totable()
-		vim.schedule(function()
-			vim.api.nvim_echo(msg, true, {
-				err = true
-			})
-		end)
-	end)
-	return self
+	return self:listen(nil, report_err)
 end
 
 ---@param next fun(ok: boolean, ...: any): alex.async.Future
@@ -554,9 +566,7 @@ function M.Mutex:with_lock(f)
 		end
 		return _unpack(results, 2)
 	end
-	return M.Task.start(function()
-		return body()
-	end):future()
+	return M.Task.start(body):future()
 end
 
 ---@class alex.async.Mpsc

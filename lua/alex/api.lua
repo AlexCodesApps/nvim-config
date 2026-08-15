@@ -11,19 +11,6 @@ function M.home_dir()
 	return state.home
 end
 
----@param filename string
----@param mode? "none"|"norm"|"vert"
-function M.edit_file(filename, mode)
-	mode = mode or "none"
-	local tbl = {
-		none = "edit ",
-		norm = "new ",
-		vert = "vnew "
-	}
-	local cmd = tbl[mode] .. vim.fn.fnameescape(filename)
-	vim.cmd(cmd)
-end
-
 ---@param name string
 function M.lsp_client_available(name)
 	local config = vim.lsp.config[name]
@@ -39,7 +26,6 @@ function M.lsp_client_available(name)
 	end
 	return vim.fn.executable(path) == 1
 end
-
 
 ---@param bufnr? integer
 ---@return boolean
@@ -119,7 +105,7 @@ end
 
 ---@class alex.api.HitEnterPromptMode
 ---@field major 'r'
----@field prompt_type 'norm'|'more'|'query'
+---@field prompt_type 'normal'|'more'|'query'
 
 ---@class alex.api.ShellMode
 ---@field major '!'
@@ -174,7 +160,7 @@ function M.mode_info()
 		cr = { major = 'c', overstrike = true, ex = false },
 		cv = { major = 'c', overstrike = false, ex = true },
 		cvr = { major = 'c', overstrike = true, ex = true },
-		r = { major = 'r', prompt_type = 'norm' },
+		r = { major = 'r', prompt_type = 'normal' },
 		rm = { major = 'r', prompt_type = 'more' },
 		['r?'] = { major = 'r', prompt_type = 'query' },
 		['!'] = { major = '!' },
@@ -186,6 +172,36 @@ end
 ---@param mode alex.api.ModeInfo
 function M.mode_info_is_visual(mode)
 	return mode.major == 'x'
+end
+
+---@return string[]
+function M.get_selection()
+	return vim.fn.getregion(
+		vim.fn.getpos('v'),
+		vim.fn.getpos('.'), { type = vim.fn.mode() })
+end
+
+---@param buf integer?
+function M.ensure_treesitter_parse(buf)
+	vim.treesitter.get_parser(buf):parse()
+end
+
+---@param node TSNode
+function M.goto_node(node)
+	local row, col = node:start()
+	vim.api.nvim_win_set_cursor(0, { row+1, col })
+end
+
+---@param buf integer
+---@param node TSNode
+---@return string[]
+function M.get_node_text(buf, node)
+	local srow, scol = node:start()
+	local erow, ecol = node:end_()
+	return vim.api.nvim_buf_get_text(
+		buf,
+		srow, scol,
+		erow, ecol, {})
 end
 
 return M
