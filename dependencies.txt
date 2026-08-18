@@ -8,4 +8,6 @@ vscode-html-language-server
 emmet-language-server
 jedi-language-server
 pyright-langserver
+rust-analyzer
 gopls
+hls

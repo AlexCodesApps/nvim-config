@@ -127,6 +127,6 @@ local function setup()
 	end
 end
 
-setup()
+vim.schedule(setup)
 
 return M

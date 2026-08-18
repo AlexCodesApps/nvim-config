@@ -253,23 +253,30 @@ function M.Repl:shutdown()
 	self.actor:shutdown()
 end
 
+---@param self alex.repl.buffer.Repl
+---@param input string
+local function send(self, input)
+	if not self.actor then
+		self:start()
+	end
+	self.actor:request(input):listen(function(res)
+		if res == '' then res = '#<void>' end
+		local lines = vim.split(res, '\n', { plain = true })
+		append_view(self.view, lines)
+		if vim.api.nvim_win_is_valid(self.view_win) then
+			scroll_bottom(self.view_win, self.view)
+		end
+	end):report_err()
+end
+
 ---@param lines string[]
 function M.Repl:send(lines)
-	local req = table.concat(lines, '\n')
-	self.actor:request(req):listen(function(res)
-		if res == '' then res = '#void' end
-		append_view(self.view, vim.split(res, '\n', { plain = true }))
-		scroll_bottom(self.view_win, self.view)
-	end):report_err()
+	send(self, table.concat(lines, '\n'))
 end
 
 ---@param line string
 function M.Repl:send_line(line)
-	self.actor:request(line):listen(function(res)
-		if res == '' then res = '#void' end
-		append_view(self.view, vim.split(res, '\n', { plain = true }))
-		scroll_bottom(self.view_win, self.view)
-	end)
+	send(self, line)
 end
 
 function M.scheme_repl()

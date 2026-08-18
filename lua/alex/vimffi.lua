@@ -36,4 +36,8 @@ function M.Object:vim_script_name()
 	return ("v:lua.require'alex.vimffi'.data.%s"):format(self.id)
 end
 
+function M.Object:vim_script_call()
+	return self:vim_script_name() .. '()'
+end
+
 return M

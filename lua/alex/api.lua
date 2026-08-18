@@ -1,7 +1,6 @@
 local M = {}
 
 local state = {}
-
 local uv = vim.uv or vim.loop
 
 function M.home_dir()
@@ -61,7 +60,7 @@ function M.try_enable_clang_format(bufnr)
 ---@diagnostic disable-next-line: redefined-local
 		M.try_enable_clang_format = function(bufnr)
 			bufnr = bufnr or 0
-			vim.bo[bufnr].formatexpr = clang_format:vim_script_name() .. '()'
+			vim.bo[bufnr].formatexpr = clang_format:vim_script_call()
 			return true
 		end
 		return M.try_enable_clang_format(bufnr)
