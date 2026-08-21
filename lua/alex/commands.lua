@@ -1,6 +1,7 @@
 require('alex.remap')
 
 local cswitch = require('alex.cswitch')
+local api = require('alex.api')
 
 vim.api.nvim_create_user_command('PackUpdate', function() vim.pack.update() end, {
 	desc = 'Update installed vim.pack packages'
@@ -36,8 +37,6 @@ vim.api.nvim_create_user_command('ReplToggle', function()
 	repl:toggle(0)
 end, { desc = 'Toggle repl' })
 
-
-
 vim.api.nvim_create_user_command('ReplConnect', function()
 	local repl_ = require('alex.repl')
 	local repl = repl_.get_repl_for_buffer(0)
@@ -57,8 +56,9 @@ vim.api.nvim_create_user_command('InlineEval', function(opts)
 	inline_repl.inline_eval(opts.line1, opts.line2)
 end, { range = true, desc = 'Evaluate range with filetype specific interpreter' })
 
-vim.api.nvim_create_user_command('MkMdTable', function(opts)
-	local input = vim.api.nvim_buf_get_lines(0, opts.line1 - 1, opts.line2, true)
+---@param input string[]
+---@return string[]?
+local function make_markdown_table(input)
 	if #input < 2 then return end
 	local header = input[1]
 	table.remove(input, 1)
@@ -109,11 +109,12 @@ vim.api.nvim_create_user_command('MkMdTable', function(opts)
 	for _, row in ipairs(tbl) do
 		table.insert(output, print_row(row))
 	end
-	vim.api.nvim_buf_set_lines(0, opts.line1 - 1, opts.line2, true, output)
-end, { desc = 'Make markdown table', range = true })
+	return output
+end
 
-vim.api.nvim_create_user_command('UnMkMdTable', function(opts)
-	local input = vim.api.nvim_buf_get_lines(0, opts.line1 - 1, opts.line2, true)
+---@param input string[]
+---@return string[]?
+local function unmake_markdown_table(input)
 	if #input < 3 then return end
 	table.remove(input, 2)
 	local output = {}
@@ -127,8 +128,16 @@ vim.api.nvim_create_user_command('UnMkMdTable', function(opts)
 		end
 		table.insert(output, output_line)
 	end
-	vim.api.nvim_buf_set_lines(0, opts.line1 - 1, opts.line2, true, output)
-end, { desc = 'Unmake markdown table', range = true })
+	return output
+end
+
+api.create_filter_user_command('MakeMarkdownTable', make_markdown_table, {
+	desc = 'Make markdown table'
+})
+
+api.create_filter_user_command('UnmakeMarkdownTable', unmake_markdown_table, {
+	desc = 'Unmake markdown table'
+})
 
 vim.api.nvim_create_user_command('Pad', function(tbl)
 	local count = tonumber(tbl.args)
@@ -161,6 +170,10 @@ end, { desc = 'Enable wrapped scrolling' })
 vim.api.nvim_create_user_command('FzGrep', function(opt)
 	local cwd = opt.args ~= ''
 		and opt.args or vim.api.nvim_buf_get_name(0)
+	local strip_oil = cwd:match('^oil://(.*)$')
+	if strip_oil then
+		cwd = strip_oil
+	end
 	local stats = vim.uv.fs_stat(cwd)
 	if not stats then
 		vim.notify('argument does not exist')

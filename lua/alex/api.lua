@@ -26,6 +26,79 @@ function M.lsp_client_available(name)
 	return vim.fn.executable(path) == 1
 end
 
+---@param buf integer
+---@param start integer
+---@param end_ integer
+---@param filter fun(input: string[]): string[]?
+---@return boolean
+function M.filter_range(buf, start, end_, filter)
+	local input = vim.api.nvim_buf_get_lines(buf, start, end_, true)
+	local output = filter(input)
+	if not output then return false end
+	vim.api.nvim_buf_set_lines(buf, start, end_, true, output)
+	return true
+end
+
+---@param name string
+---@param filter fun(input: string[]): string[]?
+---@param opts vim.api.keyset.user_command
+function M.create_filter_user_command(name, filter, opts)
+	local function preview(ropts, _, preview_buf)
+		local input = vim.api.nvim_buf_get_lines(0, ropts.line1 - 1, ropts.line2, true)
+		local output = filter(input)
+		if not output then return 0 end
+		vim.api.nvim_buf_set_lines(preview_buf, 0, -1, false, output)
+		return 2
+	end
+	opts = vim.tbl_deep_extend('error', {
+		range = true,
+		preview = preview
+	}, opts)
+	vim.api.nvim_create_user_command(name, function(ropts)
+		M.filter_range(0, ropts.line1 - 1, ropts.line2, filter)
+	end, opts)
+end
+
+---@param filter fun(input: string[]): string[]?
+---@return alex.vimffi.Object
+function M.create_filter_format_obj(filter)
+	return require('alex.vimffi').Object.new(function()
+		local start = vim.v.lnum-1
+		local end_ = start+vim.v.count
+		M.filter_range(0, start, end_, filter)
+	end)
+
+end
+
+---@class alex.api.CreateExternalFormatFilterOpts
+---@field cwd string|nil
+
+---@param cmd string[]
+---@param make_opts? fun(): alex.api.CreateExternalFormatFilterOpts
+---@return fun(input: string[]): string[]?
+function M.create_external_format_filter(cmd, make_opts)
+	return function(input)
+		local opts = vim.tbl_extend('error', make_opts and make_opts() or {}, {
+			stdin = input,
+			stdout = true,
+			stderr = true
+		})
+		local completed = vim.system(cmd, opts):wait()
+		if completed.code ~= 0 then
+			vim.notify(completed.stderr)
+			return
+		end
+		assert (completed.stdout)
+		return vim.split(completed.stdout, '\n', { plain = true })
+	end
+end
+
+---@type fun(input: string[]): string[]?
+M.clang_format = M.create_external_format_filter({ 'clang-format' }, function()
+	local cwd = vim.fs.root(0, '.clang-format')
+	return { cwd = cwd }
+end)
+
 ---@param bufnr? integer
 ---@return boolean
 function M.try_enable_clang_format(bufnr)
@@ -33,30 +106,7 @@ function M.try_enable_clang_format(bufnr)
 		M.try_enable_clang_format = function() end
 		return false
 	else
-		local clang_format = require('alex.vimffi').Object.new(function()
-			local cwd = vim.b.clang_format_root
-			if not cwd then
-				cwd = vim.fs.root(0, '.clang-format')
-				vim.b.clang_format_root = cwd
-			end
-			local lines = vim.api.nvim_buf_get_lines(0, vim.v.lnum-1, vim.v.lnum-1+vim.v.count, true)
-			local result = vim.system({ 'clang-format' }, {
-				cwd = cwd,
-				stdin = lines,
-				stdout = true,
-				stderr = true,
-			}):wait()
-			if result.code ~= 0 then
-				vim.notify(result.stderr)
-				return
-			end
-			assert (result.stdout)
-			lines = vim.split(result.stdout, '\n', { plain = true })
-			if #lines > 0 and lines[#lines] == '' then
-				lines[#lines] = nil
-			end
-			vim.api.nvim_buf_set_lines(0, vim.v.lnum-1, vim.v.lnum-1+vim.v.count, true, lines)
-		end)
+		local clang_format = M.create_filter_format_obj(M.clang_format)
 ---@diagnostic disable-next-line: redefined-local
 		M.try_enable_clang_format = function(bufnr)
 			bufnr = bufnr or 0

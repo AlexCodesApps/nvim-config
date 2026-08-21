@@ -37,6 +37,7 @@ vim.o.mouse = ''
 vim.o.wrap = false
 vim.o.linebreak = true
 vim.o.scrolloff = 4
+vim.o.inccommand = 'split'
 vim.o.hls = false
 vim.g.c_no_curly_error = 1
 vim.g.signcolumn = 'yes:1'
