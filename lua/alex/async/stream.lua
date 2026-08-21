@@ -1,5 +1,6 @@
 local M = {}
 local _async = nil
+local api = require('alex.api')
 local function async_mod()
 	if not _async then
 		_async = require('alex.async')
@@ -10,7 +11,6 @@ end
 ---@class alex.async.stream.StreamReader
 ---@field partial string
 ---@field buffers alex.async.Mpsc
----@field total_accum integer
 ---@field read_lock alex.async.Mutex
 M.StreamReader = {}
 M.StreamReader.__index = M.StreamReader
@@ -22,7 +22,6 @@ function M.StreamReader.new(queue)
 	return setmetatable({
 		partial = '',
 		buffers = queue,
-		total_accum = 0,
 		read_lock = async.Mutex.new()
 	}, M.StreamReader)
 end
@@ -34,7 +33,6 @@ function M.StreamReader.new_cb(onwrite)
 	local reader = setmetatable({
 		partial = '',
 		buffers = async.Mpsc.new(),
-		total_accum = 0,
 		read_lock = async.Mutex.new()
 	}, M.StreamReader)
 	onwrite(function(err, data)
@@ -73,17 +71,17 @@ end
 ---@return alex.async.Future
 function M.StreamReader:read(nbytes)
 	return self.read_lock:with_lock(function()
-		local partial = self.partial
-		while nbytes > partial:len() do
+		local builder = api.StringBuilder.from_str(self.partial)
+		while nbytes > builder:len() do
 			local ok, chunk = self:next_chunk()
 			if not ok then
 				self.partial = ''
-				return partial
+				return builder:get()
 			end
-			partial = partial .. chunk
+			builder:put(chunk)
 		end
-		local res = partial:sub(1, nbytes)
-		self.partial = partial:sub(nbytes + 1)
+		local res
+		res, self.partial = builder:get(nbytes, nil)
 		return res
 	end):yield_if_fast()
 end
@@ -91,14 +89,14 @@ end
 ---@return alex.async.Future
 function M.StreamReader:read_to_eof()
 	return self.read_lock:with_lock(function()
-		local accum = { self.partial }
+		local builder = api.StringBuilder.from_str(self.partial)
 		self.partial = ''
 		while true do
 			local ok, chunk = self:next_chunk()
 			if not ok then break end
-			accum[#accum+1] = chunk
+			builder:put(chunk)
 		end
-		return table.concat(accum)
+		builder:get()
 	end):yield_if_fast()
 end
 
@@ -107,21 +105,21 @@ end
 function M.StreamReader:read_line(keep_newline)
 	local off = keep_newline and 0 or 1
 	return self.read_lock:with_lock(function()
-		local accum = {}
+		local builder = api.StringBuilder.new()
 		local last = self.partial
 		while true do
 			local idx = last:find('\n')
 			if idx then
 				local final = last:sub(1, idx-off)
 				self.partial = last:sub(idx+1)
-				accum[#accum+1] = final
-				return table.concat(accum)
+				builder:put(final)
+				return builder:get()
 			end
-			accum[#accum+1] = last
+			builder:put(last)
 			local ok, next = self:next_chunk()
 			if not ok then
 				self.partial = ''
-				return table.concat(accum)
+				return builder:get()
 			end
 			last = next
 		end

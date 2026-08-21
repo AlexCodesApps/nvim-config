@@ -39,9 +39,7 @@ local function mode_component()
 	else
 		name = "NORMAL"
 	end
-	return table.concat({
-		name,
-	})
+	return name
 end
 
 local function devicon_component()
@@ -64,7 +62,8 @@ local function macro_record_component()
 	}
 end
 
-function M.status_line()
+---@return fun(): string
+function M.create_status_line_component()
 	local orig = vim.o.statusline
 	return function()
 		if vim.api.nvim_get_current_win() ~= tonumber(vim.g.actual_curwin) then
@@ -83,8 +82,15 @@ function M.status_line()
 end
 
 function M.setup()
-	local cb = vimffi.Object.new(M.status_line())
+	local augroup = vim.api.nvim_create_augroup('alex.statusline', {
+		clear = true
+	})
+	local cb = vimffi.Object.new(M.create_status_line_component())
 	vim.o.statusline = '%{%' .. cb:vim_script_call() .. '%}'
+	vim.api.nvim_create_autocmd('ModeChanged', {
+		group = augroup,
+		command = 'redrawstatus'
+	})
 	-- local theme = require('lualine.themes.gruvbox')
 	-- for _, mode in ipairs {
 	-- 	'normal', 'insert', 'visual', 'replace', 'command', 'inactive'

@@ -50,6 +50,16 @@ local cache = {}
 ---@param line2 integer
 ---@return alex.async.Future
 function M.eval_range(line1, line2)
+	local lines = vim.api.nvim_buf_get_lines(0, line1-1, line2, false)
+	local function on_output(output)
+		return async.Future.value(
+			vim.split(output, '\n', { plain = true, trimempty = true }))
+	end
+	local repl = require('alex.repl').get_repl_for_buffer(0)
+	if repl and repl.interface.eval then
+		local input = table.concat(lines, '\n')
+		return repl.interface.eval(input):bind(on_output)
+	end
 	local bufnr = vim.fn.bufnr()
 	if not cache[bufnr] then
 		local actor_factory = ft_table[vim.bo.filetype]
@@ -69,15 +79,8 @@ function M.eval_range(line1, line2)
 	end
 	---@type alex.async.Actor
 	local actor = cache[bufnr]
-	local lines = vim.api.nvim_buf_get_lines(bufnr, line1-1, line2, false)
-	local function on_any_resp(resp)
-		return async.Future.value(vim.split(resp, '\n', {
-			plain = true,
-			trimempty = true,
-		}))
-	end
 	return actor:request(table.concat(lines, '\n'))
-		:bind(on_any_resp)
+				:bind(on_output)
 end
 
 ---@param line1 integer

@@ -9,11 +9,12 @@ local M = {}
 ---@field toggle fun()
 ---@field send fun(lines: string[])
 ---@field send_line? fun(line: string)
+---@field eval? fun(input: string): alex.async.Future
 ---@field setup_buf? fun(integer)
 ---@field shutdown_buf? fun(integer)
 
 ---@class alex.repl.Client
----@field private interface alex.repl.Interface
+---@field interface alex.repl.Interface
 ---@field private buffers integer[]
 M.Client = {}
 M.Client.__index = M.Client
@@ -167,6 +168,9 @@ local function buffer_repl_client(repl)
 		send_line = function(line)
 			repl:send_line(line)
 		end,
+		eval = function(input)
+			return repl.actor:request(input)
+		end,
 		setup_buf = function(buf)
 			if repl.setup_buf_cb then
 				repl.setup_buf_cb(buf)
@@ -176,7 +180,7 @@ local function buffer_repl_client(repl)
 			if repl.shutdown_buf_cb then
 				repl.shutdown_buf_cb(buf)
 			end
-		end
+		end,
 	}
 	return M.Client.new(interface)
 end

@@ -54,8 +54,12 @@ vim.api.nvim_create_autocmd('LspAttach', {
 
 vim.api.nvim_create_autocmd('LspProgress', {
 	callback = function(ev)
+		if vim.fn.mode() == 'i' then
+			return
+		end
 		local value = ev.data.params.value
-		vim.api.nvim_echo({ { value.message or 'done' } }, false, {
+		if not value.message and value.title == '' then return end
+		vim.api.nvim_echo({ { value.message or 'done' }},false, {
 			id = 'lsp.' .. ev.data.params.token,
 			kind = 'progress',
 			source = 'vim.lsp',

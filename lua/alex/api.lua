@@ -26,6 +26,44 @@ function M.lsp_client_available(name)
 	return vim.fn.executable(path) == 1
 end
 
+---@param str string
+---@param max integer
+---@rreturn string, boolean
+function M.truncate_str_by_cells(str, max)
+	local width = vim.fn.strdisplaywidth(str)
+	if width <= max then
+		return str, false
+	end
+	local off = 0
+	local len = str:len()
+	local rem = max
+	local output = M.StringBuilder.new(len)
+	while off < len do
+		 local c = vim.fn.strpart(str, off, 1, 1)
+		 local dw = vim.fn.strdisplaywidth(c)
+		 if rem - dw < 0 then
+			 break
+		 end
+		 rem = rem - dw
+		 off = off + c:len()
+		 output:put(c)
+	end
+	return output:get(), true
+end
+
+---@param msg string
+---@param history boolean
+---@param opts vim.api.keyset.echo_opts
+---@return string|integer
+function M.nvim_echo_trunc(msg, history, opts)
+	local trunc
+	msg, trunc = M.truncate_str_by_cells(msg, vim.v.echospace - 3)
+	if trunc then
+		msg = msg .. '...'
+	end
+	return vim.api.nvim_echo({{ msg }}, history, opts)
+end
+
 ---@param buf integer
 ---@param start integer
 ---@param end_ integer
@@ -251,6 +289,57 @@ function M.get_node_text(buf, node)
 		buf,
 		srow, scol,
 		erow, ecol, {})
+end
+
+--- luajit extension
+local string_buffer = require('string.buffer')
+
+---@class alex.api.StringBuilder
+---@field private inner string.buffer
+M.StringBuilder = {}
+M.StringBuilder.__index = M.StringBuilder
+
+---@param cap? integer
+---@return self
+function M.StringBuilder.new(cap)
+	return setmetatable({
+		inner = string_buffer.new(cap or 0)
+	}, M.StringBuilder)
+end
+
+---@param str string
+---@return self
+function M.StringBuilder.from_str(str)
+	local builder = M.StringBuilder.new(str:len())
+	builder.inner:put(str)
+	return builder
+end
+
+---@param data string
+function M.StringBuilder:put(data)
+	self.inner:put(data)
+end
+
+---@param len? integer
+---@param ... integer|nil
+---@return string
+function M.StringBuilder:get(len, ...)
+	return self.inner:get(len, ...)
+end
+
+---@return string
+function M.StringBuilder:__tostring()
+	return self.inner:tostring()
+end
+
+---@return string
+function M.StringBuilder:tostring()
+	return self:__tostring()
+end
+
+function M.StringBuilder:len()
+	local _, len = self.inner:ref()
+	return len
 end
 
 return M

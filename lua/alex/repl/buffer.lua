@@ -261,6 +261,7 @@ local function send(self, input)
 	end
 	self.actor:request(input):listen(function(res)
 		if res == '' then res = '#<void>' end
+		require('alex.api').nvim_echo_trunc('repl: ' .. res, false, {})
 		local lines = vim.split(res, '\n', { plain = true })
 		append_view(self.view, lines)
 		if vim.api.nvim_win_is_valid(self.view_win) then
