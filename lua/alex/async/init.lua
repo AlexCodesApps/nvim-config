@@ -734,6 +734,13 @@ function M.vim.ui.select(items, opts)
 	end)
 end
 
+---@param opts alex.overrides.InputOpts
+function M.vim.ui.input(opts)
+	return M.Future.new(function(res)
+		vim.ui.input(opts, res)
+	end)
+end
+
 M.nursery = require('alex.async.nursery')
 M.stream = require('alex.async.stream')
 M.uv = require('alex.async.uv')

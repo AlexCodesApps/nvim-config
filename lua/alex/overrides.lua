@@ -88,7 +88,7 @@ vim.ui.input = function(opts, on_confirm)
 	if opts.completion then
 		---@param findstart 0 | 1
 		---@param base string?
-		AlexOverridesCompletion = function (findstart, base)
+		local completion = function (findstart, base)
 			if findstart == 1 then
 				local col = vim.api.nvim_win_get_cursor(0)[2]
 				local line = vim.api.nvim_get_current_line()
@@ -101,7 +101,8 @@ vim.ui.input = function(opts, on_confirm)
 				return vim.fn.getcompletion(base, opts.completion, true)
 			end
 		end
-		vim.bo.omnifunc = 'v:lua.AlexOverridesCompletion'
+		local obj = require('alex.vimffi').Object.new(completion)
+		vim.bo.omnifunc = obj:vim_script_name()
 	end
 	local ns = vim.api.nvim_create_namespace('AlexOverrideInput')
 	vim.api.nvim_buf_set_lines(buf, 0, -1, false, { default })
