@@ -705,7 +705,7 @@ function M.Actor:wait()
 	return self.thread:future()
 end
 
-M.vim = {}
+M.vim = { ui = {} }
 ---@param cmd string[]
 ---@param opts vim.SystemOpts?
 ---@return vim.SystemObj obj
@@ -721,6 +721,17 @@ function M.vim.system(cmd, opts)
 	end)
 	assert(obj)
 	return obj, fut
+end
+
+--- on_choice fun(item: T|nil, idx: integer|nil)
+---@generic T
+---@param items T[]
+---@param opts alex.overrides.SelectOpts
+---@return alex.async.Future
+function M.vim.ui.select(items, opts)
+	return M.Future.new(function(res)
+		vim.ui.select(items, opts, res)
+	end)
 end
 
 M.nursery = require('alex.async.nursery')
