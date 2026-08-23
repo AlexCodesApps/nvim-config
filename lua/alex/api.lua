@@ -295,51 +295,136 @@ end
 local string_buffer = require('string.buffer')
 
 ---@class alex.api.StringBuilder
----@field private inner string.buffer
+---@field private inner any
+---@field private len any
 M.StringBuilder = {}
 M.StringBuilder.__index = M.StringBuilder
 
----@param cap? integer
----@return self
-function M.StringBuilder.new(cap)
-	return setmetatable({
-		inner = string_buffer.new(cap or 0)
-	}, M.StringBuilder)
-end
+if jit then
+	---@param cap? integer
+	---@return self
+	function M.StringBuilder.new(cap)
+		return setmetatable({
+			inner = string_buffer.new(cap or 0)
+		}, M.StringBuilder)
+	end
 
----@param str string
----@return self
-function M.StringBuilder.from_str(str)
-	local builder = M.StringBuilder.new(str:len())
-	builder.inner:put(str)
-	return builder
-end
+	---@param str string
+	---@return self
+	function M.StringBuilder.from_str(str)
+		local builder = M.StringBuilder.new(str:len())
+		builder.inner:put(str)
+		return builder
+	end
 
----@param data string
-function M.StringBuilder:put(data)
-	self.inner:put(data)
-end
+	---@param data string
+	function M.StringBuilder:put(data)
+		self.inner:put(data)
+	end
 
----@param len? integer
----@param ... integer|nil
----@return string
-function M.StringBuilder:get(len, ...)
-	return self.inner:get(len, ...)
-end
+	---@param len? integer
+	---@param ... integer|nil
+	---@return ... string
+	function M.StringBuilder:get(len, ...)
+		return self.inner:get(len, ...)
+	end
 
----@return string
-function M.StringBuilder:__tostring()
-	return self.inner:tostring()
-end
+	---@return string
+	function M.StringBuilder:__tostring()
+		return self.inner:tostring()
+	end
 
----@return string
-function M.StringBuilder:tostring()
-	return self:__tostring()
-end
+	---@return string
+	function M.StringBuilder:tostring()
+		return self.inner:tostring()
+	end
 
-function M.StringBuilder:len()
-	local _, len = self.inner:ref()
-	return len
+	function M.StringBuilder:len()
+		local _, len = self.inner:ref()
+		return len
+	end
+else
+	---@param cap? integer
+	---@return self
+	function M.StringBuilder.new(cap)
+		local _ = cap
+		return setmetatable({
+			inner = {},
+			len = 0
+		}, M.StringBuilder)
+	end
+
+	---@param str string
+	---@return self
+	function M.StringBuilder.from_str(str)
+		return setmetatable({
+			inner = { str, len = str:len() }
+		}, M.StringBuilder)
+	end
+
+	---@param data string
+	function M.StringBuilder:put(data)
+		local inner = self.inner
+		inner[#inner+1] = data
+		self.len = self.len + data:len()
+	end
+
+	---@param len integer
+	---@return string
+	function M.StringBuilder:take(len)
+		local accum = {}
+		local inner = self.inner
+		while #inner ~= 0 and len > 0 do
+			local chunk = inner[1]
+			if #chunk <= len then
+				table.remove(inner, 1)
+				accum[#accum+1] = chunk
+				self.len = self.len - #chunk
+				len = len - #chunk
+			else
+				local fst = chunk:sub(1, len)
+				local snd = chunk:sub(len+1)
+				accum[#accum+1] = fst
+				inner[1] = snd
+				self.len = self.len - #fst
+				break
+			end
+		end
+		return table.concat(accum)
+	end
+
+	---@param len? integer
+	---@param ... integer|nil
+	---@return ... string
+	function M.StringBuilder:get(len, ...)
+		if not len then
+			local inner = self.inner
+			self.inner = {}
+			self.len = 0
+			return table.concat(inner)
+		end
+		local chunks = { ... }
+		local out = {}
+		for _, chunk in ipairs(chunks) do
+			out[#out+1] = self:take(chunk)
+		end
+		return unpack(out)
+	end
+
+	---@return string
+	function M.StringBuilder:__tostring()
+		return table.concat(self.inner)
+	end
+
+	---@return string
+	function M.StringBuilder:tostring()
+		return self:__tostring()
+	end
+
+	---@return integer
+	function M.StringBuilder:len()
+		return self.len
+	end
 end
 
 return M
