@@ -14,8 +14,6 @@ vim.api.nvim_create_user_command('CSwitch', cswitch.cswitch, {
 	desc = 'Switch between file pairs via cswitch'
 })
 
-local inline_repl = require('alex.repl.inline')
-
 vim.api.nvim_create_user_command('ReplOpen', function()
 	local repl_ = require('alex.repl')
 	local repl = repl_.get_repl_for_buffer(0)
@@ -53,6 +51,7 @@ vim.api.nvim_create_user_command('ReplEvalBuf', function()
 end, { desc = 'Eval buffer' })
 
 vim.api.nvim_create_user_command('InlineEval', function(opts)
+	local inline_repl = require('alex.repl.inline')
 	inline_repl.inline_eval(opts.line1, opts.line2)
 end, { range = true, desc = 'Evaluate range with filetype specific interpreter' })
 

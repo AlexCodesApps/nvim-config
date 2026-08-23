@@ -1,6 +1,6 @@
 local M = {}
 local async = require('alex.async')
-local server_actor = require('alex.repl.actor').stdin_packet_actor
+local stdin_packet_actor = require('alex.repl.actor').stdin_packet_actor
 
 ---@return alex.async.Actor
 local function vim_actor()
@@ -28,12 +28,12 @@ local scheme_repl_path =
 
 ---@return alex.async.Actor
 local function python_actor()
-	return server_actor {'python', python_repl_path}
+	return stdin_packet_actor {'python', python_repl_path}
 end
 
 ---@return alex.async.Actor
 local function scheme_actor()
-	return server_actor {'scheme', '--script', scheme_repl_path}
+	return stdin_packet_actor {'scheme', '--script', scheme_repl_path}
 end
 
 local ft_table = {

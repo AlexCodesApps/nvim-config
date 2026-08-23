@@ -188,12 +188,12 @@ end
 
 ---@return boolean
 function M.Repl:start()
+	if self.view ~= -1 then
+		return true
+	end
 	local actor = self.new_actor()
 	if not actor then
 		return false
-	end
-	if self.view ~= -1 then
-		return true
 	end
 	self.actor = actor
 	local view_name = 'repl://' .. self.filetype .. '/view'
@@ -307,7 +307,7 @@ end
 
 function M.scheme_repl()
 	local repl = M.Repl.new('scheme', function()
-		require'alex.repl.actor'.stdin_packet_actor
+		return require'alex.repl.actor'.stdin_packet_actor
 			{ 'scheme', '--script', config .. '/lua/alex/repl/scheme-inline-repl.scm' }
 	end)
 	function repl:on_start_cb()
