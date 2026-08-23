@@ -100,18 +100,20 @@ function M.StreamReader:read_to_eof()
 	end):yield_if_fast()
 end
 
----@param keep_newline? boolean
----@return alex.async.Future
-function M.StreamReader:read_line(keep_newline)
-	local off = keep_newline and 0 or 1
+---@param delim string
+---@param keep? boolean
+---@param plain? boolean
+function M.StreamReader:read_to_delimiter(delim, keep, plain)
+	local len = delim:len()
+	local off = keep and 0 or len
 	return self.read_lock:with_lock(function()
 		local builder = api.StringBuilder.new()
 		local last = self.partial
 		while true do
-			local idx = last:find('\n')
+			local idx = last:find(delim, nil, plain)
 			if idx then
 				local final = last:sub(1, idx-off)
-				self.partial = last:sub(idx+1)
+				self.partial = last:sub(idx+len)
 				builder:put(final)
 				return builder:get()
 			end
@@ -124,6 +126,12 @@ function M.StreamReader:read_line(keep_newline)
 			last = next
 		end
 	end):yield_if_fast()
+end
+
+---@param keep_newline? boolean
+---@return alex.async.Future
+function M.StreamReader:read_line(keep_newline)
+	return self:read_to_delimiter('\n', keep_newline, true)
 end
 
 ---@return boolean

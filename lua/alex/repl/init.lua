@@ -7,8 +7,8 @@ local M = {}
 ---@field open fun(): boolean
 ---@field close fun()
 ---@field toggle fun()
----@field send fun(lines: string[])
----@field send_line? fun(line: string)
+---@field send fun(lines: string[]): boolean
+---@field send_line? fun(line: string): boolean
 ---@field eval? fun(input: string): alex.async.Future
 ---@field setup_buf? fun(integer)
 ---@field shutdown_buf? fun(integer)
@@ -129,10 +129,10 @@ local function job_repl_client(repl)
 			repl:toggle()
 		end,
 		send = function(lines)
-			repl:send(lines)
+			return repl:send(lines)
 		end,
 		send_line = function(line)
-			repl:send_line(line)
+			return repl:send_line(line)
 		end
 	}
 	return M.Client.new(interface)
@@ -146,15 +146,13 @@ local function buffer_repl_client(repl)
 	---@type alex.repl.Interface
 	local interface = {
 		start = function()
-			repl:start()
-			return true
+			return repl:start()
 		end,
 		shutdown = function()
 			repl:shutdown()
 		end,
 		open = function()
-			repl:open()
-			return true
+			return repl:open()
 		end,
 		close = function()
 			repl:close()
@@ -163,13 +161,13 @@ local function buffer_repl_client(repl)
 			repl:toggle()
 		end,
 		send = function(input)
-			repl:send(input)
+			return repl:send(input)
 		end,
 		send_line = function(line)
-			repl:send_line(line)
+			return repl:send_line(line)
 		end,
 		eval = function(input)
-			return repl.actor:request(input)
+			return repl:eval(input)
 		end,
 		setup_buf = function(buf)
 			if repl.setup_buf_cb then

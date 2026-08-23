@@ -131,8 +131,9 @@ function M.Repl:shutdown()
 end
 
 ---@param input string|string[]
+---@return boolean
 function M.Repl:send(input)
-	if not self:start() then return end
+	if not self:start() then return false end
 	if type(input) == 'string' then
 		input = vim.split(input, '\n')
 	else
@@ -147,13 +148,16 @@ function M.Repl:send(input)
 	end
 	escaped = escaped:gsub('\t', '    ')
 	vim.api.nvim_chan_send(self.jid, escaped)
+	return true
 end
 
 ---@param input string
+---@return boolean
 function M.Repl:send_line(input)
-	if not self:start() then return end
+	if not self:start() then return false end
 	local escaped = input:gsub('\t', '    ') .. '\n'
 	vim.api.nvim_chan_send(self.jid, escaped)
+	return true
 end
 
 ---@return boolean

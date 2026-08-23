@@ -38,7 +38,7 @@ end
 ---@field input_win integer
 ---@field actor alex.async.Actor
 ---@field history alex.repl.buffer.History
----@field argv string[]
+---@field new_actor fun(): alex.async.Actor?
 ---@field on_start_cb? fun(self: self)
 ---@field setup_buf_cb? fun(integer)
 ---@field shutdown_buf_cb? fun(integer)
@@ -123,10 +123,10 @@ end
 ---@field shutdown_buf? fun(integer)
 
 ---@param filetype string
----@param argv string[]
+---@param new_actor fun(): alex.async.Actor?
 ---@param opts? alex.repl.buffer.ReplOpts
 ---@return alex.repl.buffer.Repl
-function M.Repl.new(filetype, argv, opts)
+function M.Repl.new(filetype, new_actor, opts)
 	opts = opts or {}
 	local ns = vim.api.nvim_create_namespace('repl://' .. filetype .. '/namespace')
 	local self = setmetatable({
@@ -137,7 +137,7 @@ function M.Repl.new(filetype, argv, opts)
 		input = -1,
 		input_win = -1,
 		history = {},
-		argv = argv,
+		new_actor = new_actor,
 		on_start_cb = opts.on_start,
 		setup_buf_cb = opts.setup_buf,
 		shutdown_buf_cb = opts.shutdown_buf
@@ -186,17 +186,22 @@ local function install_window_autocmds(self)
 	})
 end
 
+---@return boolean
 function M.Repl:start()
-	if self.view ~= -1 then
-		return
+	local actor = self.new_actor()
+	if not actor then
+		return false
 	end
+	if self.view ~= -1 then
+		return true
+	end
+	self.actor = actor
 	local view_name = 'repl://' .. self.filetype .. '/view'
 	local input_name = 'repl://' .. self.filetype .. '/input'
 	self.view = create_or_reset(view_name, true, false)
 	self.input = create_or_reset(input_name, false, true)
 	vim.bo[self.input].filetype = self.filetype
 	set_buffer_opts(self.view, self.input)
-	self.actor = require('alex.repl.actor').server_actor(self.argv)
 	vim.keymap.set('n', '<CR>', function()
 		local lines = vim.api.nvim_buf_get_lines(self.input, 0, -1, false)
 		vim.api.nvim_buf_set_lines(self.input, 0, -1, false, {})
@@ -222,10 +227,13 @@ function M.Repl:start()
 	if self.on_start_cb then
 		self:on_start_cb()
 	end
+	return true
 end
 
 function M.Repl:open()
-	self:start()
+	if not self:start() then
+		return false
+	end
 	self:close()
 	self.view_win, self.input_win = open_windows(self.view, self.input)
 	install_window_autocmds(self)
@@ -249,39 +257,59 @@ function M.Repl:toggle()
 end
 
 function M.Repl:shutdown()
-	vim.notify('repl shutdown')
 	self.actor:shutdown()
 end
 
 ---@param self alex.repl.buffer.Repl
 ---@param input string
+---@return boolean
 local function send(self, input)
-	if not self.actor then
-		self:start()
+	if not self.actor and not self:start() then
+		return false
 	end
 	self.actor:request(input):listen(function(res)
 		if res == '' then res = '#<void>' end
-		require('alex.api').nvim_echo_trunc('repl: ' .. res, false, {})
 		local lines = vim.split(res, '\n', { plain = true })
 		append_view(self.view, lines)
 		if vim.api.nvim_win_is_valid(self.view_win) then
 			scroll_bottom(self.view_win, self.view)
+		else
+			require('alex.api').nvim_echo_trunc('repl: ' .. res, false, {})
 		end
 	end):report_err()
+	return true
 end
 
 ---@param lines string[]
+---@return boolean
 function M.Repl:send(lines)
-	send(self, table.concat(lines, '\n'))
+	return send(self, table.concat(lines, '\n'))
 end
 
 ---@param line string
+---@return boolean
 function M.Repl:send_line(line)
-	send(self, line)
+	return send(self, line)
+end
+
+---@param input string
+---@return alex.async.Future
+function M.Repl:eval(input)
+	local async = require('alex.async')
+	if not self.actor and not self:start() then
+		return async.Future.err("couldn't start repl")
+	end
+	return self.actor:request(input):bind(function(res)
+		if res == '' then res = '#<void>' end
+		return async.Future.value(res)
+	end)
 end
 
 function M.scheme_repl()
-	local repl = M.Repl.new('scheme', { 'scheme', '--script', config .. '/lua/alex/repl/scheme-inline-repl.scm' })
+	local repl = M.Repl.new('scheme', function()
+		require'alex.repl.actor'.stdin_packet_actor
+			{ 'scheme', '--script', config .. '/lua/alex/repl/scheme-inline-repl.scm' }
+	end)
 	function repl:on_start_cb()
 		local complete_col = nil
 		local obj = require('alex.vimffi').Object.new(function(findstart, base)
@@ -334,7 +362,10 @@ function M.scheme_repl()
 end
 
 function M.python_repl()
-	return M.Repl.new('python', { 'python', config .. '/lua/alex/repl/python-inline-repl.py' })
+	return M.Repl.new('python', function()
+		return require'alex.repl.actor'.stdin_packet_actor
+			{ 'python', config .. '/lua/alex/repl/python-inline-repl.py' }
+	end)
 end
 
 return M

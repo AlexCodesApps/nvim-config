@@ -1,7 +1,3 @@
---[[
---	This module uses a simple bespoke binary format for transmitting messages,
---	[8byte big endian length][content].
-]]--
 local M = {}
 local async = require('alex.async')
 
@@ -33,10 +29,11 @@ local function be64_to_int(s)
 end
 
 ---@param args string[]
----@return alex.async.Actor
-function M.server_actor(args)
+---@param conf table
+---@return vim.SystemObj, alex.async.stream.StreamReader, alex.async.Future
+local function system(args, conf)
 	local queue = async.Mpsc.new()
-	local proc, on_exit = async.vim.system(args, {
+	conf = vim.tbl_extend('error', conf, {
 		stdin = true,
 		stdout = function (err, data)
 			if data then
@@ -54,7 +51,20 @@ function M.server_actor(args)
 			vim.notify('STDERR: ' .. data or err)
 		end
 	})
+	local obj, exit = async.vim.system(args, conf)
 	local reader = async.stream.StreamReader.new(queue)
+	return obj, reader, exit
+end
+
+
+---
+--- This packet actor function uses a simple bespoke binary format for transmitting messages,
+--- [8byte big endian length][content].
+---
+---@param args string[]
+---@return alex.async.Actor
+function M.stdin_packet_actor(args)
+	local proc, reader, on_exit = system(args, {})
 	local actor = async.Actor.new(function(input)
 		assert(type(input) == 'string')
 		local header = int_to_be64(input:len())

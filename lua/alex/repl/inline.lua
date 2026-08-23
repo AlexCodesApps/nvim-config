@@ -1,6 +1,6 @@
 local M = {}
 local async = require('alex.async')
-local server_actor = require('alex.repl.actor').server_actor
+local server_actor = require('alex.repl.actor').stdin_packet_actor
 
 ---@return alex.async.Actor
 local function vim_actor()
